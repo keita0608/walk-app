@@ -48,7 +48,6 @@ export async function POST(request: Request) {
   }
 
   const cookieStore = cookies()
-  const pendingCookies: { name: string; value: string; options: CookieOptions }[] = []
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -56,7 +55,7 @@ export async function POST(request: Request) {
     {
       cookies: {
         getAll() { return cookieStore.getAll() },
-        setAll(c: { name: string; value: string; options: CookieOptions }[]) { pendingCookies.push(...c) },
+        setAll() {},
       },
     }
   )
@@ -70,33 +69,19 @@ export async function POST(request: Request) {
     return NextResponse.redirect(url.toString(), { status: 303 })
   }
 
-  // verifyOtp後はsetAllが自動で呼ばれないため、setSessionで明示的にCookieを書き込む
-  if (data.session) {
-    await supabase.auth.setSession({
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
-    })
-  }
-
-  if (pendingCookies.length === 0) {
+  if (!data.session) {
     const url = new URL('/', origin)
-    url.searchParams.set('error', 'セッションの作成に失敗しました。もう一度お試しください。')
+    url.searchParams.set('error', 'セッションの取得に失敗しました。もう一度お試しください。')
     url.searchParams.set('email', email)
     return NextResponse.redirect(url.toString(), { status: 303 })
   }
 
-  // 200レスポンスでCookieを設定してからJSでリダイレクト
-  // (リダイレクトレスポンスのSet-CookieがCDNで除去される問題を回避)
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<script>window.location.replace('/contests')</script>
-</head><body>ログイン中...</body></html>`
-
-  const response = new NextResponse(html, {
-    status: 200,
-    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  // createServerClientはCookieを書き込まないため、
+  // トークンをURLハッシュでクライアントページに渡し、
+  // ブラウザクライアントがCookieを設定する
+  const params = new URLSearchParams({
+    access_token: data.session.access_token,
+    refresh_token: data.session.refresh_token,
   })
-  pendingCookies.forEach(({ name, value, options }) =>
-    response.cookies.set(name, value, options)
-  )
-  return response
+  return NextResponse.redirect(`${origin}/auth/complete#${params.toString()}`, { status: 303 })
 }
