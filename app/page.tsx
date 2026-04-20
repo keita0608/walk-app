@@ -44,12 +44,12 @@ export default function AuthPage() {
     const { error } = await supabase.auth.verifyOtp({
       email,
       token: otp,
-      type: 'email',
+      type: 'magiclink',
     })
 
     setLoading(false)
     if (error) {
-      setError('コードが正しくありません。もう一度お試しください。')
+      setError(`認証エラー: ${error.message}`)
       return
     }
 
