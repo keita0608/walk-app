@@ -1,13 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 type Step = 'email' | 'otp'
 
 export default function AuthPage() {
-  const router = useRouter()
   const supabase = createClient()
 
   const [step, setStep] = useState<Step>('email')
@@ -41,24 +39,24 @@ export default function AuthPage() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       email,
       token: otp,
       type: 'email',
     })
 
-    setLoading(false)
     if (error) {
+      setLoading(false)
       setError(`認証エラー: ${error.message}`)
       return
     }
 
-    // Check if user has a profile (username)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) return
+    const user = data.user
+    if (!user) {
+      setLoading(false)
+      setError('認証に失敗しました。もう一度お試しください。')
+      return
+    }
 
     const { data: profile } = await supabase
       .from('profiles')
@@ -67,9 +65,9 @@ export default function AuthPage() {
       .single()
 
     if (profile?.username) {
-      router.push('/contests')
+      window.location.href = '/contests'
     } else {
-      router.push('/register')
+      window.location.href = '/register'
     }
   }
 
