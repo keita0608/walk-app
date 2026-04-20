@@ -17,9 +17,10 @@ export default async function ContestsPage() {
   const service = createServiceClient()
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect('/')
+    data: { session },
+  } = await supabase.auth.getSession()
+  if (!session) redirect('/')
+  const user = session.user
 
   const { data: profile } = await supabase
     .from('profiles')
