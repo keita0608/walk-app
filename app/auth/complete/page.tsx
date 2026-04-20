@@ -20,13 +20,18 @@ export default function AuthComplete() {
 
     supabase.auth
       .setSession({ access_token, refresh_token })
-      .then(({ error }) => {
-        if (error) {
-          setStatus('エラー: ' + error.message)
-          setTimeout(() => window.location.replace('/'), 2000)
-        } else {
-          window.location.replace('/contests')
+      .then(async ({ error: setErr }) => {
+        if (setErr) {
+          setStatus('setSessionエラー: ' + setErr.message)
+          return
         }
+        const { data: { user }, error: getUserErr } = await supabase.auth.getUser()
+        if (getUserErr || !user) {
+          setStatus('getUserエラー: ' + (getUserErr?.message ?? 'userがnull'))
+          return
+        }
+        setStatus('認証成功: ' + user.email + ' → 移動中...')
+        setTimeout(() => window.location.replace('/contests'), 800)
       })
   }, [])
 

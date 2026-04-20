@@ -31,7 +31,7 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  const protectedPaths = ['/register', '/setup', '/ranking', '/contests', '/admin']
+  const protectedPaths = ['/register', '/setup', '/ranking', '/admin']
   const isProtected = protectedPaths.some((p) => pathname.startsWith(p))
 
   if (!session && isProtected) {
