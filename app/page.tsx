@@ -2,28 +2,28 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { verifyOtpAction } from '@/app/actions/auth'
 
-type Step = 'email' | 'otp'
+type Step = 'email' | 'sent'
 
 export default function AuthPage() {
   const supabase = createClient()
 
   const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
-  const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
 
-  async function handleSendOtp(e: React.FormEvent) {
+  async function handleSendLink(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { shouldCreateUser: true },
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
     })
 
     setLoading(false)
@@ -31,27 +31,7 @@ export default function AuthPage() {
       setError(`送信エラー: ${error.message}`)
       return
     }
-    setMessage(`${email} に確認コードを送信しました`)
-    setStep('otp')
-  }
-
-  async function handleVerifyOtp(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
-    try {
-      const result = await verifyOtpAction(email, otp)
-      if (result?.error) {
-        setError(`認証エラー: ${result.error}`)
-        setLoading(false)
-        return
-      }
-      window.location.href = '/contests'
-    } catch {
-      setError('予期しないエラーが発生しました。もう一度お試しください。')
-      setLoading(false)
-    }
+    setStep('sent')
   }
 
   return (
@@ -67,7 +47,7 @@ export default function AuthPage() {
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
           {step === 'email' ? (
-            <form onSubmit={handleSendOtp} className="space-y-4">
+            <form onSubmit={handleSendLink} className="space-y-4">
               <div>
                 <label
                   htmlFor="email"
@@ -97,61 +77,32 @@ export default function AuthPage() {
                 disabled={loading}
                 className="w-full bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-semibold py-3 px-4 rounded-xl transition-colors text-sm"
               >
-                {loading ? '送信中...' : '確認コードを送信'}
+                {loading ? '送信中...' : 'ログインリンクを送信'}
               </button>
             </form>
           ) : (
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
-              <p className="text-sm text-gray-600 bg-brand-50 px-3 py-2 rounded-lg">
-                {message}
+            <div className="space-y-4 text-center">
+              <div className="text-4xl">📬</div>
+              <p className="text-sm font-medium text-gray-900">
+                メールを確認してください
               </p>
-              <div>
-                <label
-                  htmlFor="otp"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  確認コード（6〜8桁）
-                </label>
-                <input
-                  id="otp"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]{6,8}"
-                  maxLength={8}
-                  required
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                  placeholder="12345678"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm tracking-widest text-center text-lg font-mono"
-                />
-              </div>
-
-              {error && (
-                <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
-                  {error}
-                </p>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-semibold py-3 px-4 rounded-xl transition-colors text-sm"
-              >
-                {loading ? '確認中...' : 'ログイン'}
-              </button>
-
+              <p className="text-sm text-gray-500">
+                <span className="font-medium text-gray-700">{email}</span>{' '}
+                にログインリンクを送信しました。
+                <br />
+                メール内のリンクをタップしてログインしてください。
+              </p>
               <button
                 type="button"
                 onClick={() => {
                   setStep('email')
-                  setOtp('')
                   setError('')
                 }}
                 className="w-full text-sm text-gray-500 hover:text-gray-700 py-2"
               >
                 メールアドレスを変更
               </button>
-            </form>
+            </div>
           )}
         </div>
 
