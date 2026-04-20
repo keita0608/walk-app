@@ -40,9 +40,16 @@ export default function AuthPage() {
     setLoading(true)
     setError('')
 
-    const result = await verifyOtpAction(email, otp)
-    if (result?.error) {
-      setError(`認証エラー: ${result.error}`)
+    try {
+      const result = await verifyOtpAction(email, otp)
+      if (result?.error) {
+        setError(`認証エラー: ${result.error}`)
+        setLoading(false)
+        return
+      }
+      window.location.href = '/contests'
+    } catch {
+      setError('予期しないエラーが発生しました。もう一度お試しください。')
       setLoading(false)
     }
   }
