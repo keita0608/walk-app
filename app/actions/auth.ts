@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation'
 export async function verifyOtpAction(
   email: string,
   token: string
-): Promise<{ error: string }> {
+): Promise<{ error: string } | void> {
   const supabase = createClient()
 
   const { error } = await supabase.auth.verifyOtp({
