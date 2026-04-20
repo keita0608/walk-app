@@ -1,29 +1,36 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-type Step = 'email' | 'sent'
+type Step = 'email' | 'otp'
 
 export default function AuthPage() {
   const supabase = createClient()
+  const searchParams = useSearchParams()
 
   const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
 
-  async function handleSendLink(e: React.FormEvent) {
+  useEffect(() => {
+    const err = searchParams.get('error')
+    const em = searchParams.get('email')
+    if (err) setError(`認証エラー: ${err}`)
+    if (em) setEmail(em)
+  }, [searchParams])
+
+  async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
+      options: { shouldCreateUser: true },
     })
 
     setLoading(false)
@@ -31,7 +38,8 @@ export default function AuthPage() {
       setError(`送信エラー: ${error.message}`)
       return
     }
-    setStep('sent')
+    setMessage(`${email} に確認コードを送信しました`)
+    setStep('otp')
   }
 
   return (
@@ -47,7 +55,7 @@ export default function AuthPage() {
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
           {step === 'email' ? (
-            <form onSubmit={handleSendLink} className="space-y-4">
+            <form onSubmit={handleSendOtp} className="space-y-4">
               <div>
                 <label
                   htmlFor="email"
@@ -77,24 +85,47 @@ export default function AuthPage() {
                 disabled={loading}
                 className="w-full bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-semibold py-3 px-4 rounded-xl transition-colors text-sm"
               >
-                {loading ? '送信中...' : 'ログインリンクを送信'}
+                {loading ? '送信中...' : '確認コードを送信'}
               </button>
             </form>
           ) : (
-            <div className="space-y-4 text-center">
-              <div className="text-4xl">📬</div>
-              <p className="text-sm font-medium text-gray-900">
-                メールを確認してください
+            <form
+              method="POST"
+              action="/auth/callback"
+              className="space-y-4"
+            >
+              <input type="hidden" name="email" value={email} />
+
+              <p className="text-sm text-gray-600 bg-brand-50 px-3 py-2 rounded-lg">
+                {message}
               </p>
-              <p className="text-sm text-gray-500 leading-relaxed">
-                <span className="font-medium text-gray-700">{email}</span>{' '}
-                にメールを送信しました。
-              </p>
-              <div className="bg-brand-50 rounded-xl px-4 py-3 text-sm text-brand-800 text-left">
-                <p className="font-semibold mb-1">ログイン方法：</p>
-                <p>メール内の <strong>「Log In」ボタン</strong> または<strong>リンク</strong>をタップしてください。</p>
-                <p className="mt-1 text-xs text-brand-600">※ 数字コードは使いません</p>
+              <div>
+                <label
+                  htmlFor="otp"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  確認コード（8桁）
+                </label>
+                <input
+                  id="otp"
+                  name="token"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]{6,8}"
+                  maxLength={8}
+                  required
+                  placeholder="12345678"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm tracking-widest text-center text-lg font-mono"
+                />
               </div>
+
+              <button
+                type="submit"
+                className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors text-sm"
+              >
+                ログイン
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
@@ -105,7 +136,7 @@ export default function AuthPage() {
               >
                 メールアドレスを変更
               </button>
-            </div>
+            </form>
           )}
         </div>
 
