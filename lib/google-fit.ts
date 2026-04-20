@@ -57,11 +57,8 @@ export async function fetchTodaySteps(
   accessToken: string,
   dateJST: string
 ): Promise<number> {
-  // dateJST is YYYY-MM-DD in JST
   const [year, month, day] = dateJST.split('-').map(Number)
-  // Build start/end in UTC for the given JST date (JST = UTC+9)
-  const startMs =
-    Date.UTC(year, month - 1, day) - 9 * 60 * 60 * 1000
+  const startMs = Date.UTC(year, month - 1, day) - 9 * 60 * 60 * 1000
   const endMs = startMs + 24 * 60 * 60 * 1000
 
   const res = await fetch(GOOGLE_FIT_URL, {
@@ -92,6 +89,84 @@ export async function fetchTodaySteps(
   return points.reduce((sum, p) => sum + (p.value[0]?.intVal ?? 0), 0)
 }
 
+// Fetch steps for a date range in one API call. Returns Map<YYYY-MM-DD, steps>.
+export async function fetchStepsForRange(
+  accessToken: string,
+  startDateJST: string,
+  endDateJST: string
+): Promise<Map<string, number>> {
+  const [sy, sm, sd] = startDateJST.split('-').map(Number)
+  const [ey, em, ed] = endDateJST.split('-').map(Number)
+  const startMs = Date.UTC(sy, sm - 1, sd) - 9 * 60 * 60 * 1000
+  const endMs = Date.UTC(ey, em - 1, ed) - 9 * 60 * 60 * 1000 + 24 * 60 * 60 * 1000
+
+  const res = await fetch(GOOGLE_FIT_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      aggregateBy: [
+        {
+          dataTypeName: 'com.google.step_count.delta',
+          dataSourceId:
+            'derived:com.google.step_count.delta:com.google.android.gms:estimated_steps',
+        },
+      ],
+      bucketByTime: { durationMillis: 86400000 },
+      startTimeMillis: startMs,
+      endTimeMillis: endMs,
+    }),
+  })
+
+  if (!res.ok) throw new Error('Google Fit API error')
+
+  const data = await res.json()
+  const result = new Map<string, number>()
+  for (const bucket of data?.bucket ?? []) {
+    const bucketStartMs = Number(bucket.startTimeMillis)
+    // Convert UTC ms → JST date string
+    const jstMs = bucketStartMs + 9 * 60 * 60 * 1000
+    const d = new Date(jstMs)
+    const dateStr = d.toISOString().split('T')[0]
+    const points: { value: { intVal?: number }[] }[] =
+      bucket?.dataset?.[0]?.point ?? []
+    const steps = points.reduce((sum, p) => sum + (p.value[0]?.intVal ?? 0), 0)
+    if (steps > 0) result.set(dateStr, steps)
+  }
+  return result
+}
+
 export function getTodayJST(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
+}
+
+// Returns the effective end date for ranking: min(today, contestEndDate)
+export function effectiveEndDate(contestEndDate: string): string {
+  const today = getTodayJST()
+  return today <= contestEndDate ? today : contestEndDate
+}
+
+// Days elapsed from start to effectiveEnd (inclusive), minimum 1
+export function daysElapsed(startDate: string, endDate: string): number {
+  const today = getTodayJST()
+  if (today < startDate) return 0
+  const end = today <= endDate ? today : endDate
+  const diffMs =
+    new Date(end + 'T00:00:00').getTime() -
+    new Date(startDate + 'T00:00:00').getTime()
+  return Math.floor(diffMs / 86400000) + 1
+}
+
+// All YYYY-MM-DD dates from start to end (inclusive)
+export function dateRange(startDate: string, endDate: string): string[] {
+  const dates: string[] = []
+  const cur = new Date(startDate + 'T00:00:00')
+  const last = new Date(endDate + 'T00:00:00')
+  while (cur <= last) {
+    dates.push(cur.toLocaleDateString('en-CA'))
+    cur.setDate(cur.getDate() + 1)
+  }
+  return dates
 }

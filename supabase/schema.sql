@@ -67,9 +67,37 @@ create policy "api_tokens_select" on public.api_tokens
 create policy "api_tokens_insert" on public.api_tokens
   for insert to authenticated with check (user_id = auth.uid());
 
+-- contests: バトルコンテスト
+create table public.contests (
+  id uuid default gen_random_uuid() primary key,
+  title text not null,
+  start_date date not null,
+  end_date date not null,
+  created_by uuid references auth.users(id),
+  created_at timestamptz default now(),
+  check (end_date >= start_date)
+);
+
+-- contest_participants: コンテスト参加者
+create table public.contest_participants (
+  contest_id uuid references public.contests(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete cascade,
+  primary key (contest_id, user_id)
+);
+
 -- daily_steps: 全認証ユーザーが読める（ランキング表示のため）
 create policy "steps_select" on public.daily_steps
   for select to authenticated using (true);
 
 create policy "steps_self_write" on public.daily_steps
   for all to authenticated using (user_id = auth.uid());
+
+-- contests: 全認証ユーザーが読める、書き込みはservice roleのみ（API経由）
+alter table public.contests enable row level security;
+alter table public.contest_participants enable row level security;
+
+create policy "contests_select" on public.contests
+  for select to authenticated using (true);
+
+create policy "participants_select" on public.contest_participants
+  for select to authenticated using (true);

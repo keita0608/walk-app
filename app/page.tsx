@@ -67,7 +67,7 @@ export default function AuthPage() {
       .single()
 
     if (profile?.username) {
-      router.push('/ranking')
+      router.push('/contests')
     } else {
       router.push('/register')
     }

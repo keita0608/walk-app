@@ -302,7 +302,7 @@ function SetupContent() {
 
       <div className="mt-8">
         <button
-          onClick={() => router.push('/ranking')}
+          onClick={() => router.push('/contests')}
           className="w-full bg-gray-900 hover:bg-gray-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors text-sm"
         >
           ランキングを見る →

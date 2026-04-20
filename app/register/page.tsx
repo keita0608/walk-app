@@ -31,7 +31,7 @@ export default function RegisterPage() {
         .single()
 
       if (profile?.username) {
-        router.push('/ranking')
+        router.push('/contests')
         return
       }
       setChecking(false)
