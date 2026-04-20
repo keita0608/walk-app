@@ -29,7 +29,7 @@ export default function AuthPage() {
 
     setLoading(false)
     if (error) {
-      setError('メール送信に失敗しました。メールアドレスを確認してください。')
+      setError(`送信エラー: ${error.message}`)
       return
     }
     setMessage(`${email} に確認コードを送信しました`)
