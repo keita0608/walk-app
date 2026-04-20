@@ -61,13 +61,21 @@ export async function POST(request: Request) {
     }
   )
 
-  const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' })
+  const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' })
 
   if (error) {
     const url = new URL('/', origin)
     url.searchParams.set('error', error.message)
     url.searchParams.set('email', email)
     return NextResponse.redirect(url.toString(), { status: 303 })
+  }
+
+  // verifyOtp後はsetAllが自動で呼ばれないため、setSessionで明示的にCookieを書き込む
+  if (data.session) {
+    await supabase.auth.setSession({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+    })
   }
 
   if (pendingCookies.length === 0) {
