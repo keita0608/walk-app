@@ -70,7 +70,23 @@ export async function POST(request: Request) {
     return NextResponse.redirect(url.toString(), { status: 303 })
   }
 
-  const response = NextResponse.redirect(`${origin}/contests`, { status: 303 })
+  if (pendingCookies.length === 0) {
+    const url = new URL('/', origin)
+    url.searchParams.set('error', 'セッションの作成に失敗しました。もう一度お試しください。')
+    url.searchParams.set('email', email)
+    return NextResponse.redirect(url.toString(), { status: 303 })
+  }
+
+  // 200レスポンスでCookieを設定してからJSでリダイレクト
+  // (リダイレクトレスポンスのSet-CookieがCDNで除去される問題を回避)
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<script>window.location.replace('/contests')</script>
+</head><body>ログイン中...</body></html>`
+
+  const response = new NextResponse(html, {
+    status: 200,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  })
   pendingCookies.forEach(({ name, value, options }) =>
     response.cookies.set(name, value, options)
   )
