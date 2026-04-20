@@ -39,35 +39,30 @@ export default function AuthPage() {
     setLoading(true)
     setError('')
 
-    const { data, error } = await supabase.auth.verifyOtp({
-      email,
-      token: otp,
-      type: 'email',
-    })
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token: otp,
+        type: 'email',
+      })
 
-    if (error) {
-      setLoading(false)
-      setError(`認証エラー: ${error.message}`)
-      return
-    }
+      if (error) {
+        setError(`認証エラー: ${error.message}`)
+        setLoading(false)
+        return
+      }
 
-    const user = data.user
-    if (!user) {
-      setLoading(false)
-      setError('認証に失敗しました。もう一度お試しください。')
-      return
-    }
+      if (!data.session) {
+        setError('セッションの作成に失敗しました。もう一度お試しください。')
+        setLoading(false)
+        return
+      }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('username')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.username) {
+      // /contests side handles redirect to /register if no profile yet
       window.location.href = '/contests'
-    } else {
-      window.location.href = '/register'
+    } catch (err) {
+      setError('予期しないエラーが発生しました。もう一度お試しください。')
+      setLoading(false)
     }
   }
 
