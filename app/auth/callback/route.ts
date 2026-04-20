@@ -18,7 +18,7 @@ export async function GET(request: Request) {
       {
         cookies: {
           getAll() { return cookieStore.getAll() },
-          setAll(c) { pendingCookies.push(...c) },
+          setAll(c: { name: string; value: string; options: CookieOptions }[]) { pendingCookies.push(...c) },
         },
       }
     )
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     {
       cookies: {
         getAll() { return cookieStore.getAll() },
-        setAll(c) { pendingCookies.push(...c) },
+        setAll(c: { name: string; value: string; options: CookieOptions }[]) { pendingCookies.push(...c) },
       },
     }
   )
