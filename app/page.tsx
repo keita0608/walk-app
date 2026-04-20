@@ -12,6 +12,7 @@ function AuthPageContent() {
 
   const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
+  const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -40,6 +41,32 @@ function AuthPageContent() {
     }
     setMessage(`${email} に確認コードを送信しました`)
     setStep('otp')
+  }
+
+  async function handleVerifyOtp(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token: otp,
+      type: 'email',
+    })
+
+    if (error) {
+      setError(`認証エラー: ${error.message}`)
+      setLoading(false)
+      return
+    }
+
+    if (!data.session) {
+      setError('セッションの取得に失敗しました。もう一度お試しください。')
+      setLoading(false)
+      return
+    }
+
+    window.location.href = '/contests'
   }
 
   return (
@@ -89,13 +116,7 @@ function AuthPageContent() {
               </button>
             </form>
           ) : (
-            <form
-              method="POST"
-              action="/auth/callback"
-              className="space-y-4"
-            >
-              <input type="hidden" name="email" value={email} />
-
+            <form onSubmit={handleVerifyOtp} className="space-y-4">
               <p className="text-sm text-gray-600 bg-brand-50 px-3 py-2 rounded-lg">
                 {message}
               </p>
@@ -104,32 +125,41 @@ function AuthPageContent() {
                   htmlFor="otp"
                   className="block text-sm font-medium text-gray-700 mb-1"
                 >
-                  確認コード（8桁）
+                  確認コード（6〜8桁）
                 </label>
                 <input
                   id="otp"
-                  name="token"
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]{6,8}"
                   maxLength={8}
                   required
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
                   placeholder="12345678"
                   className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm tracking-widest text-center text-lg font-mono"
                 />
               </div>
 
+              {error && (
+                <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                  {error}
+                </p>
+              )}
+
               <button
                 type="submit"
-                className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors text-sm"
+                disabled={loading}
+                className="w-full bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-semibold py-3 px-4 rounded-xl transition-colors text-sm"
               >
-                ログイン
+                {loading ? '確認中...' : 'ログイン'}
               </button>
 
               <button
                 type="button"
                 onClick={() => {
                   setStep('email')
+                  setOtp('')
                   setError('')
                 }}
                 className="w-full text-sm text-gray-500 hover:text-gray-700 py-2"
