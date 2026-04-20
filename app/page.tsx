@@ -40,27 +40,22 @@ export default function AuthPage() {
     setError('')
 
     try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        email,
-        token: otp,
-        type: 'email',
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, token: otp }),
       })
 
-      if (error) {
-        setError(`認証エラー: ${error.message}`)
+      const json = await res.json()
+
+      if (!res.ok) {
+        setError(`認証エラー: ${json.error}`)
         setLoading(false)
         return
       }
 
-      if (!data.session) {
-        setError('セッションの作成に失敗しました。もう一度お試しください。')
-        setLoading(false)
-        return
-      }
-
-      // /contests side handles redirect to /register if no profile yet
       window.location.href = '/contests'
-    } catch (err) {
+    } catch {
       setError('予期しないエラーが発生しました。もう一度お試しください。')
       setLoading(false)
     }
