@@ -129,18 +129,18 @@ export default function AuthPage() {
                   htmlFor="otp"
                   className="block text-sm font-medium text-gray-700 mb-1"
                 >
-                  確認コード（6桁）
+                  確認コード（6〜8桁）
                 </label>
                 <input
                   id="otp"
                   type="text"
                   inputMode="numeric"
-                  pattern="[0-9]{6}"
-                  maxLength={6}
+                  pattern="[0-9]{6,8}"
+                  maxLength={8}
                   required
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                  placeholder="123456"
+                  placeholder="12345678"
                   className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm tracking-widest text-center text-lg font-mono"
                 />
               </div>
