@@ -86,12 +86,15 @@ export default function AuthPage() {
               <p className="text-sm font-medium text-gray-900">
                 メールを確認してください
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 leading-relaxed">
                 <span className="font-medium text-gray-700">{email}</span>{' '}
-                にログインリンクを送信しました。
-                <br />
-                メール内のリンクをタップしてログインしてください。
+                にメールを送信しました。
               </p>
+              <div className="bg-brand-50 rounded-xl px-4 py-3 text-sm text-brand-800 text-left">
+                <p className="font-semibold mb-1">ログイン方法：</p>
+                <p>メール内の <strong>「Log In」ボタン</strong> または<strong>リンク</strong>をタップしてください。</p>
+                <p className="mt-1 text-xs text-brand-600">※ 数字コードは使いません</p>
+              </div>
               <button
                 type="button"
                 onClick={() => {
