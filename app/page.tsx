@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { verifyOtpAction } from '@/app/actions/auth'
 
 type Step = 'email' | 'otp'
 
@@ -39,24 +40,9 @@ export default function AuthPage() {
     setLoading(true)
     setError('')
 
-    try {
-      const res = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, token: otp }),
-      })
-
-      const json = await res.json()
-
-      if (!res.ok) {
-        setError(`認証エラー: ${json.error}`)
-        setLoading(false)
-        return
-      }
-
-      window.location.href = '/contests'
-    } catch {
-      setError('予期しないエラーが発生しました。もう一度お試しください。')
+    const result = await verifyOtpAction(email, otp)
+    if (result?.error) {
+      setError(`認証エラー: ${result.error}`)
       setLoading(false)
     }
   }
