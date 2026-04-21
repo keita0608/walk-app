@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { cookies } from 'next/headers'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getTodayJST } from '@/lib/google-fit'
 
@@ -19,7 +20,22 @@ export default async function ContestsPage() {
   const {
     data: { session },
   } = await supabase.auth.getSession()
-  if (!session) redirect('/')
+  if (!session) {
+    const allCookies = cookies().getAll()
+    const names = allCookies.map((c) => `${c.name}(${c.value.length}文字)`)
+    return (
+      <div style={{ padding: 24, fontFamily: 'monospace', fontSize: 13 }}>
+        <h2>⚠️ セッションなし（診断）</h2>
+        <p>サーバーが受け取ったCookie一覧（{allCookies.length}個）:</p>
+        <pre style={{ background: '#f3f4f6', padding: 12, borderRadius: 8, whiteSpace: 'pre-wrap' }}>
+          {names.length > 0 ? names.join('\n') : '（Cookieなし）'}
+        </pre>
+        <p style={{ marginTop: 16, color: '#6b7280' }}>
+          sb- で始まるCookieがあればSupabaseセッションCookieです。
+        </p>
+      </div>
+    )
+  }
   const user = session.user
 
   const { data: profile } = await supabase
