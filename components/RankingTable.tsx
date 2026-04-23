@@ -189,21 +189,28 @@ export default function RankingTable({ entries }: Props) {
                   <span className="text-sm font-medium text-gray-700 w-24 truncate shrink-0">{entry.name}</span>
                   <span className="text-xs text-gray-400">{formatSteps(entry.totalSteps)} 歩</span>
                 </div>
-                <div className="flex h-6 rounded-full overflow-hidden">
-                  {entry.dailySteps.map((day) => {
-                    const pct = (day.steps / maxTotal) * 100;
-                    return (
-                      <div
-                        key={day.date}
-                        style={{ width: `${pct}%`, backgroundColor: DOW_COLORS[day.dow] }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTooltip({ name: entry.name, date: day.date, steps: day.steps, dow: day.dow });
-                        }}
-                        className="cursor-pointer hover:brightness-90 transition-[filter]"
-                      />
-                    );
-                  })}
+                {/* Outer track (gray bg, full width, rounded) */}
+                <div className="relative h-6 w-full bg-gray-100 rounded-full overflow-hidden">
+                  {/* Inner bar: only as wide as this participant's total — gives rounded right end */}
+                  <div
+                    className="flex h-6 rounded-full overflow-hidden absolute inset-y-0 left-0"
+                    style={{ width: `${(entry.totalSteps / maxTotal) * 100}%` }}
+                  >
+                    {entry.dailySteps.map((day) => {
+                      const pct = entry.totalSteps > 0 ? (day.steps / entry.totalSteps) * 100 : 0;
+                      return (
+                        <div
+                          key={day.date}
+                          style={{ width: `${pct}%`, backgroundColor: DOW_COLORS[day.dow] }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTooltip({ name: entry.name, date: day.date, steps: day.steps, dow: day.dow });
+                          }}
+                          className="cursor-pointer hover:brightness-90 transition-[filter]"
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             ))}
