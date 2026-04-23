@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
@@ -9,8 +9,8 @@ import { WalkEvent } from '@/lib/types';
 import { getEvent, getStep } from '@/lib/firebase/firestore';
 import { getYesterdayJST } from '@/lib/utils/date';
 
-export default function StepsPage({ params }: { params: Promise<{ eventId: string }> }) {
-  const { eventId } = use(params);
+export default function StepsPage({ params }: { params: { eventId: string } }) {
+  const { eventId } = params;
   const { user } = useAuth();
 
   const [event, setEvent]                   = useState<WalkEvent | null>(null);

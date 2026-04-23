@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AuthGuard from '@/components/AuthGuard';
 import RankingTable from '@/components/RankingTable';
@@ -9,8 +9,8 @@ import { getEvent, getEventParticipants, getStepsByEvent, getUsers } from '@/lib
 import { computeRankings } from '@/lib/utils/ranking';
 import { displayDate } from '@/lib/utils/date';
 
-export default function RankingPage({ params }: { params: Promise<{ eventId: string }> }) {
-  const { eventId } = use(params);
+export default function RankingPage({ params }: { params: { eventId: string } }) {
+  const { eventId } = params;
   const [event, setEvent]       = useState<WalkEvent | null>(null);
   const [entries, setEntries]   = useState<RankingEntry[]>([]);
   const [loading, setLoading]   = useState(true);
