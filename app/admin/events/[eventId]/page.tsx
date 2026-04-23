@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AuthGuard from '@/components/AuthGuard';
 import RankingTable from '@/components/RankingTable';
@@ -20,8 +20,8 @@ import { EventStatus } from '@/lib/types';
 
 type Tab = 'ranking' | 'participants' | 'correction';
 
-export default function AdminEventPage({ params }: { params: Promise<{ eventId: string }> }) {
-  const { eventId } = use(params);
+export default function AdminEventPage({ params }: { params: { eventId: string } }) {
+  const { eventId } = params;
 
   const [event, setEvent]           = useState<WalkEvent | null>(null);
   const [participants, setParticipants] = useState<AppUser[]>([]);
