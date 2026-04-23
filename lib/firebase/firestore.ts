@@ -38,6 +38,10 @@ export async function updateUser(userId: string, data: Partial<Omit<AppUser, 'id
   await updateDoc(doc(db, 'users', userId), data);
 }
 
+export async function saveApiToken(userId: string, token: string): Promise<void> {
+  await updateDoc(doc(db, 'users', userId), { apiToken: token });
+}
+
 export async function deleteUserRecord(userId: string): Promise<void> {
   await deleteDoc(doc(db, 'users', userId));
 }
