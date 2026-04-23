@@ -1,12 +1,15 @@
 export type UserRole = 'admin' | 'user';
 export type EventType = 'individual' | 'team';
 export type EventStatus = 'upcoming' | 'active' | 'finished';
+export type Gender = 'male' | 'female';
 
 export interface AppUser {
   id: string;
   name: string;
   email: string;
   role: UserRole;
+  gender?: Gender;
+  targetSteps?: number;
 }
 
 export interface WalkEvent {
@@ -16,6 +19,7 @@ export interface WalkEvent {
   endDate: string;   // YYYY-MM-DD
   type: EventType;
   status: EventStatus;
+  handicapMultiplier?: number; // applied to female users, default 1
 }
 
 export interface EventParticipant {
@@ -44,9 +48,12 @@ export interface StepEntry {
 export interface RankingEntry {
   userId: string;
   name: string;
+  gender?: Gender;
   totalSteps: number;
   averageSteps: number;
+  netAverageSteps: number;
   elapsedDays: number;
   submittedDays: number;
   hasMissingData: boolean;
+  targetSteps?: number;
 }

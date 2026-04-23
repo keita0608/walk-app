@@ -22,7 +22,7 @@ export default function Navbar() {
       <div className="max-w-4xl mx-auto px-4">
         <div className="flex items-center justify-between h-14">
           <Link href="/" className="text-indigo-600 font-bold text-lg tracking-tight">
-            🚶 Step Battle
+            🚶 オペブラ陸上部-歩数バトル
           </Link>
 
           {/* Desktop nav */}
