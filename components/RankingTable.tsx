@@ -5,15 +5,15 @@ import { RankingEntry } from '@/lib/types';
 import { formatSteps } from '@/lib/utils/ranking';
 
 // Gradient palette harmonised with base indigo #5A45E2
-// Flows from royal blue → blue-indigo → indigo → purple → dusty purple → mauve
+// Sun = warm mauve → progressively cooler → Sat = deep royal blue
 export const DOW_COLORS = [
-  '#3055C8', // 0 日 (Sun)  – deep royal blue
-  '#4548DC', // 1 月 (Mon)  – blue-indigo
-  '#5A45E2', // 2 火 (Tue)  – base indigo
+  '#BE90BC', // 0 日 (Sun)  – muted mauve (warm, restful)
+  '#A870C8', // 1 月 (Mon)  – dusty purple
+  '#8E58D4', // 2 火 (Tue)  – medium purple
   '#7248DC', // 3 水 (Wed)  – indigo-purple
-  '#8E58D4', // 4 木 (Thu)  – medium purple
-  '#A870C8', // 5 金 (Fri)  – dusty purple
-  '#BE90BC', // 6 土 (Sat)  – muted mauve
+  '#5A45E2', // 4 木 (Thu)  – base indigo
+  '#4548DC', // 5 金 (Fri)  – blue-indigo
+  '#3055C8', // 6 土 (Sat)  – deep royal blue (cool, composed)
 ];
 
 const DOW_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
