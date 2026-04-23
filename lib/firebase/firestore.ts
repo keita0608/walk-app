@@ -1,0 +1,212 @@
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  documentId,
+  Timestamp,
+} from 'firebase/firestore';
+import { db } from './config';
+import { AppUser, WalkEvent, EventParticipant, Team, StepEntry } from '@/lib/types';
+
+// ─── Users ───────────────────────────────────────────────────────────────────
+
+export async function getUser(userId: string): Promise<AppUser | null> {
+  const snap = await getDoc(doc(db, 'users', userId));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() } as AppUser;
+}
+
+export async function getUsers(): Promise<AppUser[]> {
+  const snap = await getDocs(collection(db, 'users'));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as AppUser));
+}
+
+export async function createUser(userId: string, data: Omit<AppUser, 'id'>): Promise<void> {
+  await setDoc(doc(db, 'users', userId), data);
+}
+
+export async function updateUser(userId: string, data: Partial<Omit<AppUser, 'id'>>): Promise<void> {
+  await updateDoc(doc(db, 'users', userId), data);
+}
+
+export async function deleteUserRecord(userId: string): Promise<void> {
+  await deleteDoc(doc(db, 'users', userId));
+}
+
+// ─── Events ──────────────────────────────────────────────────────────────────
+
+export async function getEvents(): Promise<WalkEvent[]> {
+  const snap = await getDocs(collection(db, 'events'));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as WalkEvent));
+}
+
+export async function getEvent(eventId: string): Promise<WalkEvent | null> {
+  const snap = await getDoc(doc(db, 'events', eventId));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() } as WalkEvent;
+}
+
+export async function createEvent(data: Omit<WalkEvent, 'id'>): Promise<string> {
+  const ref = doc(collection(db, 'events'));
+  await setDoc(ref, data);
+  return ref.id;
+}
+
+export async function updateEvent(
+  eventId: string,
+  data: Partial<Omit<WalkEvent, 'id'>>,
+): Promise<void> {
+  await updateDoc(doc(db, 'events', eventId), data);
+}
+
+// Deletes an event and all its participants, teams, and steps.
+export async function deleteEvent(eventId: string): Promise<void> {
+  const deleteDocs = async (col: string, field: string) => {
+    const q = query(collection(db, col), where(field, '==', eventId));
+    const snap = await getDocs(q);
+    await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+  };
+  await Promise.all([
+    deleteDoc(doc(db, 'events', eventId)),
+    deleteDocs('eventParticipants', 'eventId'),
+    deleteDocs('teams', 'eventId'),
+    deleteDocs('steps', 'eventId'),
+  ]);
+}
+
+// ─── Event Participants ───────────────────────────────────────────────────────
+
+export async function getEventParticipants(eventId: string): Promise<EventParticipant[]> {
+  const q = query(collection(db, 'eventParticipants'), where('eventId', '==', eventId));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as EventParticipant));
+}
+
+export async function getUserParticipations(userId: string): Promise<EventParticipant[]> {
+  const q = query(collection(db, 'eventParticipants'), where('userId', '==', userId));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as EventParticipant));
+}
+
+export async function addParticipants(
+  eventId: string,
+  userIds: string[],
+  teamAssignments?: Record<string, string>,
+): Promise<void> {
+  await Promise.all(
+    userIds.map((userId) => {
+      const ref = doc(collection(db, 'eventParticipants'));
+      return setDoc(ref, {
+        eventId,
+        userId,
+        teamId: teamAssignments?.[userId] ?? null,
+      });
+    }),
+  );
+}
+
+export async function removeParticipant(participantId: string): Promise<void> {
+  await deleteDoc(doc(db, 'eventParticipants', participantId));
+}
+
+// ─── Teams ───────────────────────────────────────────────────────────────────
+
+export async function getTeams(eventId: string): Promise<Team[]> {
+  const q = query(collection(db, 'teams'), where('eventId', '==', eventId));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Team));
+}
+
+export async function createTeams(eventId: string, names: string[]): Promise<Team[]> {
+  const teams: Team[] = [];
+  await Promise.all(
+    names.map(async (name) => {
+      const ref = doc(collection(db, 'teams'));
+      await setDoc(ref, { eventId, name });
+      teams.push({ id: ref.id, eventId, name });
+    }),
+  );
+  return teams;
+}
+
+// ─── Steps ───────────────────────────────────────────────────────────────────
+
+function toStepEntry(id: string, data: Record<string, unknown>): StepEntry {
+  return {
+    id,
+    userId:      data.userId as string,
+    eventId:     data.eventId as string,
+    date:        data.date as string,
+    steps:       data.steps as number,
+    submittedAt: (data.submittedAt as Timestamp)?.toDate?.() ?? new Date(),
+    updatedAt:   (data.updatedAt as Timestamp)?.toDate?.(),
+  };
+}
+
+export async function getStepsByEvent(eventId: string): Promise<StepEntry[]> {
+  const q = query(collection(db, 'steps'), where('eventId', '==', eventId));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => toStepEntry(d.id, d.data()));
+}
+
+export async function getStep(
+  userId: string,
+  eventId: string,
+  date: string,
+): Promise<StepEntry | null> {
+  const stepId = `${userId}_${eventId}_${date}`;
+  const snap = await getDoc(doc(db, 'steps', stepId));
+  if (!snap.exists()) return null;
+  return toStepEntry(snap.id, snap.data());
+}
+
+// Uses composite ID to enforce one-submission-per-user-per-day at DB level.
+export async function submitStep(
+  userId: string,
+  eventId: string,
+  date: string,
+  steps: number,
+): Promise<void> {
+  const stepId = `${userId}_${eventId}_${date}`;
+  await setDoc(doc(db, 'steps', stepId), {
+    userId,
+    eventId,
+    date,
+    steps,
+    submittedAt: Timestamp.now(),
+  });
+}
+
+export async function adminUpdateStep(
+  userId: string,
+  eventId: string,
+  date: string,
+  steps: number,
+): Promise<void> {
+  const stepId = `${userId}_${eventId}_${date}`;
+  await setDoc(
+    doc(db, 'steps', stepId),
+    { userId, eventId, date, steps, updatedAt: Timestamp.now() },
+    { merge: true },
+  );
+}
+
+// Fetch events by IDs (for user event list)
+export async function getEventsByIds(eventIds: string[]): Promise<WalkEvent[]> {
+  if (eventIds.length === 0) return [];
+  const events: WalkEvent[] = [];
+  // Firestore 'in' query limit = 30
+  for (let i = 0; i < eventIds.length; i += 30) {
+    const batch = eventIds.slice(i, i + 30);
+    const q = query(collection(db, 'events'), where(documentId(), 'in', batch));
+    const snap = await getDocs(q);
+    events.push(...snap.docs.map((d) => ({ id: d.id, ...d.data() } as WalkEvent)));
+  }
+  return events;
+}

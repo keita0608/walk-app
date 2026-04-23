@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuth() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // request.time is UTC. JST = UTC+9h. Deadline = 10:00 JST = 01:00 UTC.
+    function isBeforeDeadlineJST() {
+      let jstMs = request.time.toMillis() + 9 * 60 * 60 * 1000;
+      let hourOfDay = int(jstMs / (60 * 60 * 1000)) % 24;
+      return hourOfDay < 10;
+    }
+
+    match /users/{userId} {
+      allow read: if isAuth();
+      // Users can self-register with role='user' only
+      allow create: if isAuth() &&
+        request.auth.uid == userId &&
+        request.resource.data.role == 'user';
+      // Users can update their own name; admin can update anything
+      allow update: if isAdmin() ||
+        (isAuth() && request.auth.uid == userId &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']));
+      allow delete: if isAdmin();
+    }
+
+    match /events/{eventId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /eventParticipants/{participantId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /teams/{teamId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // Document ID convention: {userId}_{eventId}_{date}
+    // This prevents duplicate submissions at the DB level.
+    match /steps/{stepId} {
+      allow read: if isAuth();
+      // Users can only create their own step, before 10:00 JST, with valid range.
+      // Updating an existing document requires admin (preventing edits after submit).
+      allow create: if isAuth() &&
+        request.auth.uid == request.resource.data.userId &&
+        isBeforeDeadlineJST() &&
+        request.resource.data.steps is int &&
+        request.resource.data.steps > 0 &&
+        request.resource.data.steps < 100000;
+      allow update, delete: if isAdmin();
+    }
+  }
+}
