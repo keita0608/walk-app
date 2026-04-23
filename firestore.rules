@@ -50,14 +50,14 @@ service cloud.firestore {
     // This prevents duplicate submissions at the DB level.
     match /steps/{stepId} {
       allow read: if isAuth();
+      // Admin can create/update any step (data correction).
       // Users can only create their own step, before 10:00 JST, with valid range.
-      // Updating an existing document requires admin (preventing edits after submit).
-      allow create: if isAuth() &&
+      allow create: if isAdmin() || (isAuth() &&
         request.auth.uid == request.resource.data.userId &&
         isBeforeDeadlineJST() &&
         request.resource.data.steps is int &&
         request.resource.data.steps > 0 &&
-        request.resource.data.steps < 100000;
+        request.resource.data.steps < 100000);
       allow update, delete: if isAdmin();
     }
   }

@@ -15,6 +15,8 @@ import {
   getTeams,
   updateEvent,
   deleteEvent,
+  removeParticipant,
+  addParticipants,
 } from '@/lib/firebase/firestore';
 import { computeRankings } from '@/lib/utils/ranking';
 import { displayDate } from '@/lib/utils/date';
@@ -27,6 +29,7 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
   const router = useRouter();
 
   const [event, setEvent]               = useState<WalkEvent | null>(null);
+  const [allUsers, setAllUsers]         = useState<AppUser[]>([]);
   const [participants, setParticipants] = useState<AppUser[]>([]);
   const [allParticipants, setAllParticipants] = useState<EventParticipant[]>([]);
   const [teams, setTeams]               = useState<Team[]>([]);
@@ -34,13 +37,24 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
   const [tab, setTab]                   = useState<Tab>('ranking');
   const [loading, setLoading]           = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  // Event delete
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting]         = useState(false);
+
+  // Participant remove
+  const [removingId, setRemovingId]     = useState<string | null>(null); // participantDoc id
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState<EventParticipant | null>(null);
+
+  // Participant add
+  const [showAddPanel, setShowAddPanel] = useState(false);
+  const [addSelected, setAddSelected]   = useState<string[]>([]);
+  const [adding, setAdding]             = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [ev, rawParticipants, steps, allUsers, eventTeams] = await Promise.all([
+      const [ev, rawParticipants, steps, users, eventTeams] = await Promise.all([
         getEvent(eventId),
         getEventParticipants(eventId),
         getStepsByEvent(eventId),
@@ -51,12 +65,11 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
       if (!ev) return;
       setEvent(ev);
       setAllParticipants(rawParticipants);
+      setAllUsers(users);
       setTeams(eventTeams);
 
-      const userMap = Object.fromEntries(allUsers.map((u) => [u.id, u]));
-      const pUsers = rawParticipants
-        .map((p) => userMap[p.userId])
-        .filter(Boolean) as AppUser[];
+      const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
+      const pUsers = rawParticipants.map((p) => userMap[p.userId]).filter(Boolean) as AppUser[];
       setParticipants(pUsers);
       setEntries(computeRankings(pUsers, steps, ev.startDate, ev.endDate));
     } finally {
@@ -77,7 +90,7 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
     }
   };
 
-  const handleDelete = async () => {
+  const handleDeleteEvent = async () => {
     setDeleting(true);
     try {
       await deleteEvent(eventId);
@@ -87,6 +100,35 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
       setShowDeleteConfirm(false);
     }
   };
+
+  const handleRemoveParticipant = async () => {
+    if (!showRemoveConfirm) return;
+    setRemovingId(showRemoveConfirm.id);
+    try {
+      await removeParticipant(showRemoveConfirm.id);
+      setShowRemoveConfirm(null);
+      await load();
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
+  const handleAddParticipants = async () => {
+    if (addSelected.length === 0) return;
+    setAdding(true);
+    try {
+      await addParticipants(eventId, addSelected);
+      setAddSelected([]);
+      setShowAddPanel(false);
+      await load();
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  // Users not yet in this event
+  const participantIds = new Set(allParticipants.map((p) => p.userId));
+  const nonParticipants = allUsers.filter((u) => !participantIds.has(u.id));
 
   const tabClass = (t: Tab) =>
     `px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -149,35 +191,106 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
               <button className={tabClass('correction')}  onClick={() => setTab('correction')}>データ修正</button>
             </div>
 
-            {/* Tab content */}
+            {/* ── Ranking tab ── */}
             {tab === 'ranking' && <RankingTable entries={entries} />}
 
+            {/* ── Participants tab ── */}
             {tab === 'participants' && (
-              <div className="space-y-3">
-                {participants.length === 0 ? (
-                  <p className="text-sm text-gray-400 text-center py-8">参加者がいません</p>
-                ) : (
-                  participants.map((user) => {
-                    const participation = allParticipants.find((p) => p.userId === user.id);
-                    const team = teams.find((t) => t.id === participation?.teamId);
-                    return (
-                      <div key={user.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-800 truncate">{user.name}</p>
-                          <p className="text-xs text-gray-400">{user.email}</p>
+              <div className="space-y-4">
+                {/* Current participants */}
+                <div className="space-y-2">
+                  {participants.length === 0 ? (
+                    <p className="text-sm text-gray-400 text-center py-6">参加者がいません</p>
+                  ) : (
+                    participants.map((user) => {
+                      const participation = allParticipants.find((p) => p.userId === user.id);
+                      const team = teams.find((t) => t.id === participation?.teamId);
+                      return (
+                        <div key={user.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-800 truncate">{user.name}</p>
+                            <p className="text-xs text-gray-400">{user.email}</p>
+                          </div>
+                          {team && (
+                            <span className="text-xs px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full">
+                              {team.name}
+                            </span>
+                          )}
+                          <button
+                            onClick={() => participation && setShowRemoveConfirm(participation)}
+                            disabled={removingId === participation?.id}
+                            className="text-xs text-red-400 hover:text-red-600 shrink-0"
+                          >
+                            削除
+                          </button>
                         </div>
-                        {team && (
-                          <span className="text-xs px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full">
-                            {team.name}
-                          </span>
-                        )}
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Add participants */}
+                {nonParticipants.length > 0 && (
+                  <div>
+                    {!showAddPanel ? (
+                      <button
+                        onClick={() => setShowAddPanel(true)}
+                        className="w-full py-2.5 border-2 border-dashed border-indigo-300 text-indigo-600 rounded-xl text-sm hover:bg-indigo-50"
+                      >
+                        + 参加者を追加
+                      </button>
+                    ) : (
+                      <div className="bg-white rounded-xl border border-indigo-100 shadow-sm p-4 space-y-3">
+                        <p className="text-sm font-medium text-gray-700">追加するユーザーを選択</p>
+                        <p className="text-xs text-gray-400">
+                          ※ 途中参加でも平均はイベント開始日（{displayDate(event.startDate)}）基準で計算されます
+                        </p>
+                        <div className="border border-gray-200 rounded-lg divide-y max-h-60 overflow-y-auto">
+                          {nonParticipants.map((u) => (
+                            <label key={u.id} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50">
+                              <input
+                                type="checkbox"
+                                checked={addSelected.includes(u.id)}
+                                onChange={() =>
+                                  setAddSelected((prev) =>
+                                    prev.includes(u.id)
+                                      ? prev.filter((id) => id !== u.id)
+                                      : [...prev, u.id],
+                                  )
+                                }
+                                className="accent-indigo-600 w-4 h-4"
+                              />
+                              <div>
+                                <span className="text-sm font-medium text-gray-800">{u.name}</span>
+                                <span className="text-xs text-gray-400 ml-2">{u.email}</span>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => { setShowAddPanel(false); setAddSelected([]); }}
+                            disabled={adding}
+                            className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50"
+                          >
+                            キャンセル
+                          </button>
+                          <button
+                            onClick={handleAddParticipants}
+                            disabled={adding || addSelected.length === 0}
+                            className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:bg-gray-300 font-medium"
+                          >
+                            {adding ? '追加中…' : `${addSelected.length}名を追加`}
+                          </button>
+                        </div>
                       </div>
-                    );
-                  })
+                    )}
+                  </div>
                 )}
               </div>
             )}
 
+            {/* ── Data correction tab ── */}
             {tab === 'correction' && (
               <DataCorrection
                 eventId={eventId}
@@ -188,7 +301,34 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
               />
             )}
 
-            {/* Delete confirmation dialog */}
+            {/* Remove participant confirmation */}
+            {showRemoveConfirm && (
+              <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full space-y-4">
+                  <h3 className="font-semibold text-gray-800">参加者を削除しますか？</h3>
+                  <p className="text-sm text-gray-600">
+                    <strong>{participants.find((u) => u.id === showRemoveConfirm.userId)?.name}</strong> をイベントから削除します。
+                    歩数データは残ります。ランキングからは除外されます。
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowRemoveConfirm(null)}
+                      className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      onClick={handleRemoveParticipant}
+                      className="flex-1 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 font-medium"
+                    >
+                      削除する
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Delete event confirmation */}
             {showDeleteConfirm && (
               <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full space-y-4">
@@ -205,7 +345,7 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
                       キャンセル
                     </button>
                     <button
-                      onClick={handleDelete}
+                      onClick={handleDeleteEvent}
                       disabled={deleting}
                       className="flex-1 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:bg-gray-300 font-medium"
                     >
