@@ -11,19 +11,17 @@ interface Props {
 
 export default function UserList({ users, onUpdated }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName]         = useState('');
-  const [editRole, setEditRole]         = useState<UserRole>('user');
-  const [editGender, setEditGender]     = useState<Gender | ''>('');
-  const [editTargetSteps, setEditTargetSteps] = useState('');
-  const [saving, setSaving]             = useState(false);
-  const [error, setError]               = useState('');
+  const [editName, setEditName]   = useState('');
+  const [editRole, setEditRole]   = useState<UserRole>('user');
+  const [editGender, setEditGender] = useState<Gender | ''>('');
+  const [saving, setSaving]       = useState(false);
+  const [error, setError]         = useState('');
 
   const startEdit = (user: AppUser) => {
     setEditingId(user.id);
     setEditName(user.name);
     setEditRole(user.role);
     setEditGender(user.gender ?? '');
-    setEditTargetSteps(user.targetSteps !== undefined ? String(user.targetSteps) : '');
     setError('');
   };
 
@@ -34,18 +32,12 @@ export default function UserList({ users, onUpdated }: Props) {
 
   const saveEdit = async (userId: string) => {
     if (!editName.trim()) { setError('名前を入力してください'); return; }
-    const targetStepsVal = editTargetSteps !== '' ? parseInt(editTargetSteps, 10) : undefined;
-    if (editTargetSteps !== '' && (isNaN(targetStepsVal!) || targetStepsVal! < 0)) {
-      setError('目標歩数は0以上の整数を入力してください');
-      return;
-    }
     setSaving(true);
     try {
       await updateUser(userId, {
-        name:        editName.trim(),
-        role:        editRole,
-        gender:      editGender !== '' ? editGender : undefined,
-        targetSteps: targetStepsVal,
+        name:   editName.trim(),
+        role:   editRole,
+        gender: editGender !== '' ? editGender : undefined,
       });
       setEditingId(null);
       onUpdated();
@@ -92,30 +84,17 @@ export default function UserList({ users, onUpdated }: Props) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">性別</label>
-                  <select
-                    value={editGender}
-                    onChange={(e) => setEditGender(e.target.value as Gender | '')}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">未設定</option>
-                    <option value="male">男性</option>
-                    <option value="female">女性</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">目標歩数（歩/日）</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={editTargetSteps}
-                    onChange={(e) => setEditTargetSteps(e.target.value)}
-                    placeholder="例：10000"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">性別</label>
+                <select
+                  value={editGender}
+                  onChange={(e) => setEditGender(e.target.value as Gender | '')}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">未設定</option>
+                  <option value="male">男性</option>
+                  <option value="female">女性</option>
+                </select>
               </div>
 
               {error && <p className="text-xs text-red-600">{error}</p>}
@@ -147,11 +126,6 @@ export default function UserList({ users, onUpdated }: Props) {
                     {user.role}
                   </span>
                   <span className="text-xs text-gray-400">{genderLabel(user.gender)}</span>
-                  {user.targetSteps !== undefined && (
-                    <span className="text-xs text-gray-400">
-                      目標: {user.targetSteps.toLocaleString()} 歩
-                    </span>
-                  )}
                 </div>
                 <p className="text-xs text-gray-400 truncate">{user.email}</p>
               </div>

@@ -17,6 +17,7 @@ import {
   deleteEvent,
   removeParticipant,
   addParticipants,
+  updateParticipant,
 } from '@/lib/firebase/firestore';
 import { computeRankings } from '@/lib/utils/ranking';
 import { displayDate } from '@/lib/utils/date';
@@ -43,7 +44,7 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
   const [deleting, setDeleting]         = useState(false);
 
   // Participant remove
-  const [removingId, setRemovingId]     = useState<string | null>(null); // participantDoc id
+  const [removingId, setRemovingId]     = useState<string | null>(null);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState<EventParticipant | null>(null);
 
   // Participant add
@@ -71,7 +72,7 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
       const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
       const pUsers = rawParticipants.map((p) => userMap[p.userId]).filter(Boolean) as AppUser[];
       setParticipants(pUsers);
-      setEntries(computeRankings(pUsers, steps, ev.startDate, ev.endDate, ev.handicapMultiplier ?? 1));
+      setEntries(computeRankings(pUsers, rawParticipants, steps, ev.startDate, ev.endDate));
     } finally {
       setLoading(false);
     }
@@ -124,6 +125,23 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
     } finally {
       setAdding(false);
     }
+  };
+
+  const handleParticipantField = async (
+    participantId: string,
+    field: 'targetSteps' | 'handicapMultiplier',
+    raw: string,
+  ) => {
+    const val = raw === '' ? undefined : parseFloat(raw);
+    if (raw !== '' && (isNaN(val!) || val! < 0)) return;
+    if (field === 'targetSteps' && val !== undefined && !Number.isInteger(val)) return;
+    const update = field === 'targetSteps'
+      ? { targetSteps: val as number | undefined }
+      : { handicapMultiplier: val as number | undefined };
+    await updateParticipant(participantId, update);
+    setAllParticipants((prev) =>
+      prev.map((p) => p.id === participantId ? { ...p, ...update } : p),
+    );
   };
 
   // Users not yet in this event
@@ -181,24 +199,7 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
                   </button>
                 </div>
               </div>
-              <div className="flex items-center gap-4 flex-wrap">
-                <p className="text-xs text-gray-400">参加者 {participants.length} 名</p>
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-gray-500">女性ハンデ係数：</label>
-                  <input
-                    type="number"
-                    min={1}
-                    step={0.1}
-                    defaultValue={event.handicapMultiplier ?? 1}
-                    onBlur={(e) => {
-                      const val = parseFloat(e.target.value);
-                      if (!isNaN(val) && val >= 1) updateEvent(eventId, { handicapMultiplier: val });
-                    }}
-                    className="w-20 border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <span className="text-xs text-gray-400">倍（1=ハンデなし）</span>
-                </div>
-              </div>
+              <p className="text-xs text-gray-400">参加者 {participants.length} 名</p>
             </div>
 
             {/* Tabs */}
@@ -209,12 +210,11 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
             </div>
 
             {/* ── Ranking tab ── */}
-            {tab === 'ranking' && <RankingTable entries={entries} handicapMultiplier={event.handicapMultiplier ?? 1} />}
+            {tab === 'ranking' && <RankingTable entries={entries} />}
 
             {/* ── Participants tab ── */}
             {tab === 'participants' && (
               <div className="space-y-4">
-                {/* Current participants */}
                 <div className="space-y-2">
                   {participants.length === 0 ? (
                     <p className="text-sm text-gray-400 text-center py-6">参加者がいません</p>
@@ -223,23 +223,54 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
                       const participation = allParticipants.find((p) => p.userId === user.id);
                       const team = teams.find((t) => t.id === participation?.teamId);
                       return (
-                        <div key={user.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-800 truncate">{user.name}</p>
-                            <p className="text-xs text-gray-400">{user.email}</p>
+                        <div key={user.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-2">
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-800 truncate">{user.name}</p>
+                              <p className="text-xs text-gray-400">{user.email}</p>
+                            </div>
+                            {team && (
+                              <span className="text-xs px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full">
+                                {team.name}
+                              </span>
+                            )}
+                            <button
+                              onClick={() => participation && setShowRemoveConfirm(participation)}
+                              disabled={removingId === participation?.id}
+                              className="text-xs text-red-400 hover:text-red-600 shrink-0"
+                            >
+                              削除
+                            </button>
                           </div>
-                          {team && (
-                            <span className="text-xs px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full">
-                              {team.name}
-                            </span>
+                          {participation && (
+                            <div className="flex flex-wrap gap-3 pt-1 border-t border-gray-50">
+                              <div className="flex items-center gap-1.5">
+                                <label className="text-xs text-gray-500 whitespace-nowrap">目標歩数：</label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={100}
+                                  defaultValue={participation.targetSteps ?? ''}
+                                  placeholder="例：10000"
+                                  onBlur={(e) => handleParticipantField(participation.id, 'targetSteps', e.target.value)}
+                                  className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                                <span className="text-xs text-gray-400">歩/日</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <label className="text-xs text-gray-500 whitespace-nowrap">ハンデ係数：</label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  step={0.1}
+                                  defaultValue={participation.handicapMultiplier ?? 1}
+                                  onBlur={(e) => handleParticipantField(participation.id, 'handicapMultiplier', e.target.value)}
+                                  className="w-16 border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                                <span className="text-xs text-gray-400">倍（1=なし）</span>
+                              </div>
+                            </div>
                           )}
-                          <button
-                            onClick={() => participation && setShowRemoveConfirm(participation)}
-                            disabled={removingId === participation?.id}
-                            className="text-xs text-red-400 hover:text-red-600 shrink-0"
-                          >
-                            削除
-                          </button>
                         </div>
                       );
                     })

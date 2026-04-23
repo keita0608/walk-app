@@ -9,7 +9,6 @@ export interface AppUser {
   email: string;
   role: UserRole;
   gender?: Gender;
-  targetSteps?: number;
 }
 
 export interface WalkEvent {
@@ -19,7 +18,6 @@ export interface WalkEvent {
   endDate: string;   // YYYY-MM-DD
   type: EventType;
   status: EventStatus;
-  handicapMultiplier?: number; // applied to female users, default 1
 }
 
 export interface EventParticipant {
@@ -27,6 +25,8 @@ export interface EventParticipant {
   eventId: string;
   userId: string;
   teamId?: string;
+  targetSteps?: number;
+  handicapMultiplier?: number; // per-participant, default 1 (no handicap)
 }
 
 export interface Team {
@@ -56,4 +56,6 @@ export interface RankingEntry {
   submittedDays: number;
   hasMissingData: boolean;
   targetSteps?: number;
+  handicapMultiplier: number;
+  stepsByDayOfWeek: number[]; // index 0=Sun, 1=Mon, ..., 6=Sat
 }
