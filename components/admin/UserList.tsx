@@ -135,6 +135,7 @@ export default function UserList({ users, onUpdated }: Props) {
               </div>
             </div>
           ) : (
+            <>
             <div className="flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -188,6 +189,7 @@ export default function UserList({ users, onUpdated }: Props) {
                 </button>
               )}
             </div>
+            </>
           )}
         </div>
       ))}
