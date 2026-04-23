@@ -43,8 +43,8 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="text-5xl mb-3">🚶</div>
-          <h1 className="text-2xl font-bold text-gray-800">WalkApp</h1>
-          <p className="text-sm text-gray-500 mt-1">社内歩数チャレンジ</p>
+          <h1 className="text-2xl font-bold text-gray-800">Step Battle</h1>
+          <p className="text-sm text-gray-500 mt-1">社内歩数バトル</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
