@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase/admin';
+import { getAdminDb } from '@/lib/firebase/admin';
 import { FieldPath, Timestamp } from 'firebase-admin/firestore';
 import { getYesterdayJST } from '@/lib/utils/date';
 
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Look up user by apiToken
-    const usersSnap = await adminDb
+    const usersSnap = await getAdminDb()
       .collection('users')
       .where('apiToken', '==', token)
       .limit(1)
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const userId = usersSnap.docs[0].id;
 
     // Find participations for this user
-    const participationsSnap = await adminDb
+    const participationsSnap = await getAdminDb()
       .collection('eventParticipants')
       .where('userId', '==', userId)
       .get();
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     let activeEventId: string | null = null;
     for (let i = 0; i < eventIds.length; i += 30) {
       const batch = eventIds.slice(i, i + 30);
-      const eventsSnap = await adminDb
+      const eventsSnap = await getAdminDb()
         .collection('events')
         .where(FieldPath.documentId(), 'in', batch)
         .where('status', '==', 'active')
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     const stepDate = date ?? getYesterdayJST();
     const stepId = `${userId}_${activeEventId}_${stepDate}`;
 
-    await adminDb.collection('steps').doc(stepId).set(
+    await getAdminDb().collection('steps').doc(stepId).set(
       { userId, eventId: activeEventId, date: stepDate, steps, updatedAt: Timestamp.now() },
       { merge: true },
     );
