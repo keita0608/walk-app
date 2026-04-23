@@ -65,6 +65,21 @@ export async function updateEvent(
   await updateDoc(doc(db, 'events', eventId), data);
 }
 
+// Deletes an event and all its participants, teams, and steps.
+export async function deleteEvent(eventId: string): Promise<void> {
+  const deleteDocs = async (col: string, field: string) => {
+    const q = query(collection(db, col), where(field, '==', eventId));
+    const snap = await getDocs(q);
+    await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+  };
+  await Promise.all([
+    deleteDoc(doc(db, 'events', eventId)),
+    deleteDocs('eventParticipants', 'eventId'),
+    deleteDocs('teams', 'eventId'),
+    deleteDocs('steps', 'eventId'),
+  ]);
+}
+
 // ─── Event Participants ───────────────────────────────────────────────────────
 
 export async function getEventParticipants(eventId: string): Promise<EventParticipant[]> {

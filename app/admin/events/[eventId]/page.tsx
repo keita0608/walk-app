@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import AuthGuard from '@/components/AuthGuard';
 import RankingTable from '@/components/RankingTable';
 import DataCorrection from '@/components/admin/DataCorrection';
@@ -13,6 +14,7 @@ import {
   getUsers,
   getTeams,
   updateEvent,
+  deleteEvent,
 } from '@/lib/firebase/firestore';
 import { computeRankings } from '@/lib/utils/ranking';
 import { displayDate } from '@/lib/utils/date';
@@ -22,15 +24,18 @@ type Tab = 'ranking' | 'participants' | 'correction';
 
 export default function AdminEventPage({ params }: { params: { eventId: string } }) {
   const { eventId } = params;
+  const router = useRouter();
 
-  const [event, setEvent]           = useState<WalkEvent | null>(null);
+  const [event, setEvent]               = useState<WalkEvent | null>(null);
   const [participants, setParticipants] = useState<AppUser[]>([]);
   const [allParticipants, setAllParticipants] = useState<EventParticipant[]>([]);
-  const [teams, setTeams]           = useState<Team[]>([]);
-  const [entries, setEntries]       = useState<RankingEntry[]>([]);
-  const [tab, setTab]               = useState<Tab>('ranking');
-  const [loading, setLoading]       = useState(true);
+  const [teams, setTeams]               = useState<Team[]>([]);
+  const [entries, setEntries]           = useState<RankingEntry[]>([]);
+  const [tab, setTab]                   = useState<Tab>('ranking');
+  const [loading, setLoading]           = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting]         = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -72,6 +77,17 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
     }
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await deleteEvent(eventId);
+      router.replace('/admin');
+    } catch {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   const tabClass = (t: Tab) =>
     `px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
       tab === t
@@ -104,7 +120,7 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
                     {event.type === 'individual' ? '個人戦' : 'チーム戦'}
                   </p>
                 </div>
-                <div>
+                <div className="flex items-center gap-2">
                   <select
                     value={event.status}
                     onChange={(e) => handleStatusChange(e.target.value as EventStatus)}
@@ -115,6 +131,12 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
                     <option value="active">開催中</option>
                     <option value="finished">終了</option>
                   </select>
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="text-sm px-3 py-1.5 border border-red-300 text-red-500 rounded-lg hover:bg-red-50"
+                  >
+                    削除
+                  </button>
                 </div>
               </div>
               <p className="text-xs text-gray-400">参加者 {participants.length} 名</p>
@@ -122,15 +144,13 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
 
             {/* Tabs */}
             <div className="flex border-b border-gray-200 -mb-2">
-              <button className={tabClass('ranking')}     onClick={() => setTab('ranking')}>ランキング</button>
+              <button className={tabClass('ranking')}      onClick={() => setTab('ranking')}>ランキング</button>
               <button className={tabClass('participants')} onClick={() => setTab('participants')}>参加者</button>
               <button className={tabClass('correction')}  onClick={() => setTab('correction')}>データ修正</button>
             </div>
 
             {/* Tab content */}
-            {tab === 'ranking' && (
-              <RankingTable entries={entries} />
-            )}
+            {tab === 'ranking' && <RankingTable entries={entries} />}
 
             {tab === 'participants' && (
               <div className="space-y-3">
@@ -166,6 +186,34 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
                 endDate={event.endDate}
                 onUpdated={load}
               />
+            )}
+
+            {/* Delete confirmation dialog */}
+            {showDeleteConfirm && (
+              <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full space-y-4">
+                  <h3 className="font-semibold text-gray-800">イベントを削除しますか？</h3>
+                  <p className="text-sm text-gray-600">
+                    「<strong>{event.title}</strong>」を削除します。参加者・歩数データも含めてすべて削除されます。この操作は取り消せません。
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowDeleteConfirm(false)}
+                      disabled={deleting}
+                      className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="flex-1 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:bg-gray-300 font-medium"
+                    >
+                      {deleting ? '削除中…' : '削除する'}
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
           </>
         )}
