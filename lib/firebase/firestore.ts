@@ -6,6 +6,7 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   query,
   where,
   documentId,
@@ -13,6 +14,8 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 import { AppUser, WalkEvent, EventParticipant, Team, StepEntry } from '@/lib/types';
+
+type ParticipantUpdate = Partial<Pick<EventParticipant, 'targetSteps' | 'handicapMultiplier'>>;
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 
@@ -113,6 +116,20 @@ export async function addParticipants(
 
 export async function removeParticipant(participantId: string): Promise<void> {
   await deleteDoc(doc(db, 'eventParticipants', participantId));
+}
+
+export async function updateParticipant(
+  participantId: string,
+  data: ParticipantUpdate,
+): Promise<void> {
+  const payload: Record<string, unknown> = {};
+  if ('targetSteps' in data) {
+    payload.targetSteps = data.targetSteps !== undefined ? data.targetSteps : deleteField();
+  }
+  if ('handicapMultiplier' in data) {
+    payload.handicapMultiplier = data.handicapMultiplier !== undefined ? data.handicapMultiplier : deleteField();
+  }
+  await updateDoc(doc(db, 'eventParticipants', participantId), payload);
 }
 
 // ─── Teams ───────────────────────────────────────────────────────────────────
