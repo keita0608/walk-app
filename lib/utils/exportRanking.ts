@@ -109,9 +109,10 @@ export function exportRankingAsImage(
     ctx.fillStyle = '#E5E7EB';
     ctx.fillRect(BAR_X, barY, BAR_W, 8);
 
-    // Bar fill
+    // Bar fill — indigo if target achieved (or no target), gray otherwise
+    const achieved = entry.targetSteps === undefined || steps >= entry.targetSteps;
     const fill = Math.max((steps / maxSteps) * BAR_W, 0);
-    ctx.fillStyle = '#4338CA';
+    ctx.fillStyle = achieved ? '#4338CA' : '#9CA3AF';
     ctx.fillRect(BAR_X, barY, fill, 8);
   });
 
