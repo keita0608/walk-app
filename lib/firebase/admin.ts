@@ -3,9 +3,13 @@ import { getFirestore } from 'firebase-admin/firestore';
 
 export function getAdminDb() {
   if (!getApps().length) {
-    const key = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-    if (!key) throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is not set');
-    initializeApp({ credential: cert(JSON.parse(key)) });
+    const projectId   = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey  = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+    if (!projectId || !clientEmail || !privateKey) {
+      throw new Error('Firebase Admin credentials not configured');
+    }
+    initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
   }
   return getFirestore();
 }
