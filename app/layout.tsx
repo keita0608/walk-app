@@ -5,8 +5,8 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 
 export const metadata: Metadata = {
-  title: 'Step Battle — 社内歩数バトル',
-  description: '社内歩数バトルシステム',
+  title: 'オペブラ陸上部-歩数バトル',
+  description: 'オペブラ陸上部 歩数バトルシステム',
 };
 
 const GA_ID = 'G-3XXS15BVD2';

@@ -32,7 +32,7 @@ export default function RankingPage({ params }: { params: { eventId: string } })
         .map((p) => userMap[p.userId])
         .filter(Boolean) as AppUser[];
 
-      setEntries(computeRankings(participantUsers, steps, ev.startDate, ev.endDate));
+      setEntries(computeRankings(participantUsers, steps, ev.startDate, ev.endDate, ev.handicapMultiplier ?? 1));
     } finally {
       setLoading(false);
     }
@@ -72,7 +72,7 @@ export default function RankingPage({ params }: { params: { eventId: string } })
               )}
             </div>
 
-            <RankingTable entries={entries} />
+            <RankingTable entries={entries} handicapMultiplier={event.handicapMultiplier ?? 1} />
           </>
         )}
       </div>

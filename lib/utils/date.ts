@@ -23,13 +23,15 @@ export function getYesterdayJST(): string {
   return formatDateStr(jst);
 }
 
-// Before 10:00 AM JST
+// Before 11:30 AM JST
 export function isSubmissionAllowed(): boolean {
-  return getJSTNow().getHours() < 10;
+  const jst = getJSTNow();
+  const h = jst.getHours();
+  const m = jst.getMinutes();
+  return h < 11 || (h === 11 && m < 30);
 }
 
 // Number of days from startDate through yesterday (inclusive).
-// Returns 0 if the event hasn't started yet relative to yesterday.
 export function getElapsedDays(startDate: string): number {
   const jst = getJSTNow();
   const yesterday = new Date(jst.getFullYear(), jst.getMonth(), jst.getDate() - 1);

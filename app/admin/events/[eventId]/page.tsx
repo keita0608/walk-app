@@ -71,7 +71,7 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
       const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
       const pUsers = rawParticipants.map((p) => userMap[p.userId]).filter(Boolean) as AppUser[];
       setParticipants(pUsers);
-      setEntries(computeRankings(pUsers, steps, ev.startDate, ev.endDate));
+      setEntries(computeRankings(pUsers, steps, ev.startDate, ev.endDate, ev.handicapMultiplier ?? 1));
     } finally {
       setLoading(false);
     }
@@ -181,7 +181,24 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
                   </button>
                 </div>
               </div>
-              <p className="text-xs text-gray-400">参加者 {participants.length} 名</p>
+              <div className="flex items-center gap-4 flex-wrap">
+                <p className="text-xs text-gray-400">参加者 {participants.length} 名</p>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-500">女性ハンデ係数：</label>
+                  <input
+                    type="number"
+                    min={1}
+                    step={0.1}
+                    defaultValue={event.handicapMultiplier ?? 1}
+                    onBlur={(e) => {
+                      const val = parseFloat(e.target.value);
+                      if (!isNaN(val) && val >= 1) updateEvent(eventId, { handicapMultiplier: val });
+                    }}
+                    className="w-20 border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <span className="text-xs text-gray-400">倍（1=ハンデなし）</span>
+                </div>
+              </div>
             </div>
 
             {/* Tabs */}
@@ -192,7 +209,7 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
             </div>
 
             {/* ── Ranking tab ── */}
-            {tab === 'ranking' && <RankingTable entries={entries} />}
+            {tab === 'ranking' && <RankingTable entries={entries} handicapMultiplier={event.handicapMultiplier ?? 1} />}
 
             {/* ── Participants tab ── */}
             {tab === 'participants' && (

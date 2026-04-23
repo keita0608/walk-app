@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AppUser, UserRole } from '@/lib/types';
+import { AppUser, UserRole, Gender } from '@/lib/types';
 import { updateUser } from '@/lib/firebase/firestore';
 
 interface Props {
@@ -11,15 +11,19 @@ interface Props {
 
 export default function UserList({ users, onUpdated }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName]   = useState('');
-  const [editRole, setEditRole]   = useState<UserRole>('user');
-  const [saving, setSaving]       = useState(false);
-  const [error, setError]         = useState('');
+  const [editName, setEditName]         = useState('');
+  const [editRole, setEditRole]         = useState<UserRole>('user');
+  const [editGender, setEditGender]     = useState<Gender | ''>('');
+  const [editTargetSteps, setEditTargetSteps] = useState('');
+  const [saving, setSaving]             = useState(false);
+  const [error, setError]               = useState('');
 
   const startEdit = (user: AppUser) => {
     setEditingId(user.id);
     setEditName(user.name);
     setEditRole(user.role);
+    setEditGender(user.gender ?? '');
+    setEditTargetSteps(user.targetSteps !== undefined ? String(user.targetSteps) : '');
     setError('');
   };
 
@@ -30,9 +34,19 @@ export default function UserList({ users, onUpdated }: Props) {
 
   const saveEdit = async (userId: string) => {
     if (!editName.trim()) { setError('名前を入力してください'); return; }
+    const targetStepsVal = editTargetSteps !== '' ? parseInt(editTargetSteps, 10) : undefined;
+    if (editTargetSteps !== '' && (isNaN(targetStepsVal!) || targetStepsVal! < 0)) {
+      setError('目標歩数は0以上の整数を入力してください');
+      return;
+    }
     setSaving(true);
     try {
-      await updateUser(userId, { name: editName.trim(), role: editRole });
+      await updateUser(userId, {
+        name:        editName.trim(),
+        role:        editRole,
+        gender:      editGender !== '' ? editGender : undefined,
+        targetSteps: targetStepsVal,
+      });
       setEditingId(null);
       onUpdated();
     } catch (err: unknown) {
@@ -41,6 +55,9 @@ export default function UserList({ users, onUpdated }: Props) {
       setSaving(false);
     }
   };
+
+  const genderLabel = (g?: Gender) =>
+    g === 'male' ? '男性' : g === 'female' ? '女性' : '—';
 
   return (
     <div className="space-y-3">
@@ -52,26 +69,55 @@ export default function UserList({ users, onUpdated }: Props) {
         <div key={user.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
           {editingId === user.id ? (
             <div className="space-y-3">
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">名前</label>
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">名前</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">ロール</label>
+                  <select
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value as UserRole)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="user">user</option>
+                    <option value="admin">admin</option>
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">ロール</label>
-                <select
-                  value={editRole}
-                  onChange={(e) => setEditRole(e.target.value as UserRole)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="user">user</option>
-                  <option value="admin">admin</option>
-                </select>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">性別</label>
+                  <select
+                    value={editGender}
+                    onChange={(e) => setEditGender(e.target.value as Gender | '')}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">未設定</option>
+                    <option value="male">男性</option>
+                    <option value="female">女性</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">目標歩数（歩/日）</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editTargetSteps}
+                    onChange={(e) => setEditTargetSteps(e.target.value)}
+                    placeholder="例：10000"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
               </div>
+
               {error && <p className="text-xs text-red-600">{error}</p>}
               <div className="flex gap-2">
                 <button
@@ -93,17 +139,19 @@ export default function UserList({ users, onUpdated }: Props) {
           ) : (
             <div className="flex items-center gap-3">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium text-gray-800 truncate">{user.name}</span>
-                  <span
-                    className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                      user.role === 'admin'
-                        ? 'bg-indigo-100 text-indigo-700'
-                        : 'bg-gray-100 text-gray-500'
-                    }`}
-                  >
+                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                    user.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'
+                  }`}>
                     {user.role}
                   </span>
+                  <span className="text-xs text-gray-400">{genderLabel(user.gender)}</span>
+                  {user.targetSteps !== undefined && (
+                    <span className="text-xs text-gray-400">
+                      目標: {user.targetSteps.toLocaleString()} 歩
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-gray-400 truncate">{user.email}</p>
               </div>

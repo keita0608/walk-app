@@ -33,7 +33,7 @@ export default function StepForm({ eventId, alreadySubmitted, onSubmitted }: Pro
     }
 
     if (!isSubmissionAllowed()) {
-      setError('10:00 JST を過ぎているため提出できません');
+      setError('11:30 JST を過ぎているため提出できません');
       return;
     }
 
@@ -56,7 +56,7 @@ export default function StepForm({ eventId, alreadySubmitted, onSubmitted }: Pro
 
       {!allowed && !alreadySubmitted && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
-          10:00 JST を過ぎたため、本日の提出は締め切られました。
+          11:30 JST を過ぎたため、本日の提出は締め切られました。
         </div>
       )}
 
