@@ -70,7 +70,7 @@ export default function DataCorrection({
   };
 
   const handleSave = async () => {
-    const toSave = [...dirty].filter((d) => days[d]?.value.trim() !== '');
+    const toSave = Array.from(dirty).filter((d) => days[d]?.value.trim() !== '');
     const invalid = toSave.find((d) => {
       const v = parseInt(days[d].value, 10);
       return isNaN(v) || v < 0 || v >= 100000;
