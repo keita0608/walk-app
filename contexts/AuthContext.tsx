@@ -30,17 +30,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
       if (fbUser) {
-        let userData = await getUser(fbUser.uid);
-        if (!userData) {
-          const newUser: Omit<AppUser, 'id'> = {
+        try {
+          let userData = await getUser(fbUser.uid);
+          if (!userData) {
+            const newUser: Omit<AppUser, 'id'> = {
+              name:  fbUser.email?.split('@')[0] ?? 'ユーザー',
+              email: fbUser.email ?? '',
+              role:  'user',
+            };
+            await createUser(fbUser.uid, newUser);
+            userData = { id: fbUser.uid, ...newUser };
+          }
+          setUser(userData);
+        } catch (err) {
+          console.error('Failed to load user profile:', err);
+          // Still set a minimal user so the app doesn't get stuck
+          setUser({
+            id:    fbUser.uid,
             name:  fbUser.email?.split('@')[0] ?? 'ユーザー',
             email: fbUser.email ?? '',
             role:  'user',
-          };
-          await createUser(fbUser.uid, newUser);
-          userData = { id: fbUser.uid, ...newUser };
+          });
         }
-        setUser(userData);
       } else {
         setUser(null);
       }
