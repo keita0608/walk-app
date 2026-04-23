@@ -91,15 +91,15 @@ export default function UsersPage() {
                   <li>右上の <strong>＋</strong> をタップ → 「アクションを追加」</li>
                   <li>「<strong>ヘルスケアサンプルを検索</strong>」を検索して追加
                     <ul className="list-disc list-inside ml-4 mt-1 text-xs text-gray-400">
-                      <li>種類：<strong>歩数</strong></li>
-                      <li>期間：<strong>昨日</strong></li>
-                      <li>並び替え・上限などはデフォルトのまま</li>
+                      <li>種類：<strong>Steps（歩数）</strong></li>
+                      <li>開始日の条件：「過去の期間内」の数値を <strong>7 → 1</strong> に変更</li>
+                      <li>グループ分け：<strong>なし</strong>、制限：<strong>オフ</strong>のまま</li>
                     </ul>
                   </li>
-                  <li>「<strong>統計を計算</strong>」アクションを追加（前のステップの結果が自動で入力に入ります）
+                  <li>「<strong>統計を計算</strong>」アクションを追加
                     <ul className="list-disc list-inside ml-4 mt-1 text-xs text-gray-400">
-                      <li>統計：<strong>合計</strong></li>
-                      <li>入力：ヘルスケアサンプルの「<strong>値</strong>」</li>
+                      <li>入力：前のアクション（ヘルスケアサンプル）の「<strong>値</strong>」を選択</li>
+                      <li>統計の種類：<strong>合計</strong></li>
                     </ul>
                   </li>
                   <li>「<strong>URLの内容を取得</strong>」アクションを追加
