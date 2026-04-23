@@ -86,6 +86,7 @@ export default function RankingTable({ entries }: Props) {
         const targetPct = entry.targetSteps !== undefined
           ? Math.min((entry.targetSteps / maxVal) * 100, 100)
           : null;
+        const achieved = entry.targetSteps === undefined || displaySteps >= entry.targetSteps;
 
         return (
           <div key={entry.userId} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
@@ -121,7 +122,7 @@ export default function RankingTable({ entries }: Props) {
             </div>
             <div className="relative w-full bg-gray-100 rounded-full h-3">
               <div
-                className="bg-indigo-500 h-3 rounded-full transition-all duration-500"
+                className={`${achieved ? 'bg-indigo-500' : 'bg-gray-400'} h-3 rounded-full transition-all duration-500`}
                 style={{ width: `${barPct}%` }}
               />
               {targetPct !== null && (
