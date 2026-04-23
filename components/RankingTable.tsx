@@ -40,11 +40,12 @@ export default function RankingTable({ entries }: Props) {
   const [view, setView] = useState<View>('gross');
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
 
-  const displayEntries = [...entries].sort((a, b) =>
-    view === 'net'
+  const displayEntries = [...entries].sort((a, b) => {
+    const diff = view === 'net'
       ? b.netAverageSteps - a.netAverageSteps
-      : b.averageSteps - a.averageSteps,
-  );
+      : b.averageSteps - a.averageSteps;
+    return diff !== 0 ? diff : a.name.localeCompare(b.name);
+  });
 
   const maxVal = Math.max(
     ...displayEntries.map((e) => view === 'net' ? e.netAverageSteps : e.averageSteps),
@@ -52,7 +53,9 @@ export default function RankingTable({ entries }: Props) {
     1,
   );
 
-  const chartEntries = [...entries].sort((a, b) => b.totalSteps - a.totalSteps);
+  const chartEntries = [...entries].sort((a, b) =>
+    b.totalSteps - a.totalSteps || a.name.localeCompare(b.name),
+  );
   const maxTotal = Math.max(...chartEntries.map((e) => e.totalSteps), 1);
 
   if (entries.length === 0) {

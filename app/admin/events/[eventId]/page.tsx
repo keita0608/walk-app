@@ -22,6 +22,7 @@ import {
 import { computeRankings } from '@/lib/utils/ranking';
 import { displayDate } from '@/lib/utils/date';
 import { EventStatus } from '@/lib/types';
+import { exportRankingAsImage } from '@/lib/utils/exportRanking';
 
 type Tab = 'ranking' | 'participants' | 'correction';
 
@@ -210,7 +211,20 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
             </div>
 
             {/* ── Ranking tab ── */}
-            {tab === 'ranking' && <RankingTable entries={entries} />}
+            {tab === 'ranking' && (
+              <div className="space-y-3">
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => exportRankingAsImage(entries, event.title, event.startDate, event.endDate)}
+                    disabled={entries.length === 0}
+                    className="text-sm px-3 py-1.5 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-40"
+                  >
+                    📷 画像を保存
+                  </button>
+                </div>
+                <RankingTable entries={entries} />
+              </div>
+            )}
 
             {/* ── Participants tab ── */}
             {tab === 'participants' && (
