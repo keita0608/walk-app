@@ -7,6 +7,12 @@ function jpDate(d: string) {
   return `${y}年${m}月${day}日`;
 }
 
+function timestamp() {
+  const now = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}`;
+}
+
 export function exportRankingAsImage(
   entries: RankingEntry[],
   eventTitle: string,
@@ -58,6 +64,7 @@ export function exportRankingAsImage(
   // Rows
   const maxSteps = Math.max(
     ...sorted.map((e) => hasHandicap ? e.netAverageSteps : e.averageSteps),
+    ...sorted.map((e) => e.targetSteps ?? 0),
     1,
   );
   const BAR_X = W - PAD - 220;
@@ -85,18 +92,15 @@ export function exportRankingAsImage(
     else { ctx.fillStyle = '#9CA3AF'; ctx.font = `14px ${FONT}`; }
     ctx.fillText(String(idx + 1), PAD + 14, ry);
 
-    // Name
-    ctx.fillStyle = '#111827';
+    // Name — blue for male, pink for female, dark for unset
+    const nameColor =
+      entry.gender === 'male' ? '#3B6FD4' :
+      entry.gender === 'female' ? '#C0588A' :
+      '#111827';
+    ctx.fillStyle = nameColor;
     ctx.font = `bold 14px ${FONT}`;
     ctx.textAlign = 'left';
     ctx.fillText(entry.name, PAD + 36, ry);
-
-    // Missing data warning
-    if (entry.hasMissingData) {
-      ctx.fillStyle = '#D97706';
-      ctx.font = `11px ${FONT}`;
-      ctx.fillText('▲', PAD + 36 + ctx.measureText(entry.name).width + 6, ry);
-    }
 
     // Steps value
     ctx.fillStyle = '#4338CA';
@@ -114,6 +118,13 @@ export function exportRankingAsImage(
     const fill = Math.max((steps / maxSteps) * BAR_W, 0);
     ctx.fillStyle = achieved ? '#4338CA' : '#9CA3AF';
     ctx.fillRect(BAR_X, barY, fill, 8);
+
+    // Target line (red vertical line)
+    if (entry.targetSteps !== undefined) {
+      const targetX = BAR_X + Math.min((entry.targetSteps / maxSteps) * BAR_W, BAR_W);
+      ctx.fillStyle = '#EF4444';
+      ctx.fillRect(targetX - 1, barY - 4, 2, 16);
+    }
   });
 
   // Footer
@@ -128,9 +139,9 @@ export function exportRankingAsImage(
   ctx.textBaseline = 'middle';
   ctx.fillText(`オペブラ陸上部-歩数バトル  ·  ${dateStr} 出力`, W / 2, footerY + FOOTER_H / 2);
 
-  // Download
+  // Download — yyyymmddhhmmss.png
   const a = document.createElement('a');
-  a.download = `${eventTitle}_ランキング.png`;
+  a.download = `${timestamp()}.png`;
   a.href = canvas.toDataURL('image/png');
   a.click();
 }
