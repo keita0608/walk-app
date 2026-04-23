@@ -14,11 +14,8 @@ interface Props {
 }
 
 interface DayState {
-  value: string;       // current input value
-  submitted: boolean;  // has a Firestore entry
-  saving: boolean;
-  error: string;
-  saved: boolean;      // flash after save
+  value: string;
+  submitted: boolean; // has existing Firestore entry
 }
 
 function shortDate(d: string) {
@@ -38,10 +35,16 @@ export default function DataCorrection({
   const [selectedUserId, setSelectedUserId] = useState('');
   const [loading, setLoading] = useState(false);
   const [days, setDays] = useState<Record<string, DayState>>({});
+  const [dirty, setDirty] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const loadUser = async (userId: string) => {
-    if (!userId) { setDays({}); return; }
+    if (!userId) { setDays({}); setDirty(new Set()); return; }
     setLoading(true);
+    setSaveError('');
+    setSaveSuccess(false);
     try {
       const entries = await Promise.all(dates.map((d) => getStep(userId, eventId, d)));
       const next: Record<string, DayState> = {};
@@ -49,12 +52,10 @@ export default function DataCorrection({
         next[d] = {
           value: entries[i] ? String(entries[i]!.steps) : '',
           submitted: !!entries[i],
-          saving: false,
-          error: '',
-          saved: false,
         };
       });
       setDays(next);
+      setDirty(new Set());
     } finally {
       setLoading(false);
     }
@@ -62,29 +63,43 @@ export default function DataCorrection({
 
   useEffect(() => { loadUser(selectedUserId); }, [selectedUserId]);
 
-  const update = (date: string, patch: Partial<DayState>) =>
-    setDays((prev) => ({ ...prev, [date]: { ...prev[date], ...patch } }));
+  const handleChange = (date: string, value: string) => {
+    setDays((prev) => ({ ...prev, [date]: { ...prev[date], value } }));
+    setDirty((prev) => new Set(prev).add(date));
+    setSaveSuccess(false);
+  };
 
-  const handleBlur = async (date: string) => {
-    const day = days[date];
-    if (!day || !selectedUserId) return;
-    const raw = day.value.trim();
-    if (raw === '') return; // don't save empty on blur
-    const val = parseInt(raw, 10);
-    if (isNaN(val) || val < 0 || val >= 100000) {
-      update(date, { error: '0〜99999の整数' });
+  const handleSave = async () => {
+    const toSave = [...dirty].filter((d) => days[d]?.value.trim() !== '');
+    const invalid = toSave.find((d) => {
+      const v = parseInt(days[d].value, 10);
+      return isNaN(v) || v < 0 || v >= 100000;
+    });
+    if (invalid) {
+      setSaveError(`${shortDate(invalid)}: 0〜99999の整数を入力してください`);
       return;
     }
-    update(date, { saving: true, error: '' });
+    setSaving(true);
+    setSaveError('');
     try {
-      await adminUpdateStep(selectedUserId, eventId, date, val);
-      update(date, { saving: false, submitted: true, saved: true });
-      setTimeout(() => update(date, { saved: false }), 1500);
+      await Promise.all(
+        toSave.map((d) =>
+          adminUpdateStep(selectedUserId, eventId, d, parseInt(days[d].value, 10)),
+        ),
+      );
+      setDirty(new Set());
+      setSaveSuccess(true);
       onUpdated();
-    } catch {
-      update(date, { saving: false, error: '保存失敗' });
+      // Reload to reflect submitted status
+      await loadUser(selectedUserId);
+    } catch (err: unknown) {
+      setSaveError('保存に失敗しました: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setSaving(false);
     }
   };
+
+  const hasDirty = dirty.size > 0;
 
   return (
     <div className="space-y-5">
@@ -111,46 +126,53 @@ export default function DataCorrection({
       )}
 
       {!loading && selectedUserId && dates.length > 0 && (
-        <div className="space-y-2">
-          {dates.map((date) => {
-            const day = days[date];
-            if (!day) return null;
-            const missing = !day.submitted && day.value === '';
-            return (
-              <div key={date} className="flex items-center gap-3">
-                <span className="text-sm text-gray-600 w-12 shrink-0 font-medium">
-                  {shortDate(date)}
-                </span>
-                {missing ? (
-                  <span className="text-red-500 text-base shrink-0" title="未入力">⚠️</span>
-                ) : (
-                  <span className="w-5 shrink-0" />
-                )}
-                <div className="flex items-center gap-2 flex-1">
+        <>
+          <div className="space-y-2">
+            {dates.map((date) => {
+              const day = days[date];
+              if (!day) return null;
+              const missing = !day.submitted && day.value === '';
+              const isDirty = dirty.has(date);
+              return (
+                <div key={date} className="flex items-center gap-3">
+                  <span className="text-sm text-gray-600 w-12 shrink-0 font-medium">{shortDate(date)}</span>
+                  {missing ? (
+                    <span className="text-base shrink-0" title="未入力">⚠️</span>
+                  ) : (
+                    <span className="w-5 shrink-0" />
+                  )}
                   <input
                     type="number"
                     min={0}
                     max={99999}
                     value={day.value}
-                    onChange={(e) => update(date, { value: e.target.value, error: '', saved: false })}
-                    onBlur={() => handleBlur(date)}
+                    onChange={(e) => handleChange(date, e.target.value)}
                     placeholder="未入力"
                     className={`w-32 border rounded-lg px-3 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                      day.error ? 'border-red-400' : missing ? 'border-yellow-300 bg-yellow-50' : 'border-gray-300'
+                      missing
+                        ? 'border-yellow-300 bg-yellow-50'
+                        : isDirty
+                        ? 'border-indigo-400 bg-indigo-50'
+                        : 'border-gray-300'
                     }`}
                   />
-                  {day.saving && <span className="text-xs text-gray-400">保存中…</span>}
-                  {day.saved && <span className="text-xs text-green-500">✓</span>}
-                  {day.error && <span className="text-xs text-red-500">{day.error}</span>}
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
 
-      {!loading && selectedUserId && dates.length === 0 && (
-        <p className="text-sm text-gray-400 text-center py-6">対象日がありません</p>
+          <div className="space-y-2 pt-1">
+            {saveError && <p className="text-sm text-red-600">{saveError}</p>}
+            {saveSuccess && <p className="text-sm text-green-600">保存しました</p>}
+            <button
+              onClick={handleSave}
+              disabled={!hasDirty || saving}
+              className="w-full py-2.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:bg-gray-300 font-medium text-sm"
+            >
+              {saving ? '保存中…' : `保存する${hasDirty ? ` (${dirty.size}件)` : ''}`}
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

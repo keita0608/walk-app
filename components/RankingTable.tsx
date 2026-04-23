@@ -171,7 +171,7 @@ export default function RankingTable({ entries }: Props) {
                   <span className="text-sm font-medium text-gray-700 w-24 truncate shrink-0">{entry.name}</span>
                   <span className="text-xs text-gray-400">{formatSteps(entry.totalSteps)} 歩</span>
                 </div>
-                <div className="flex h-6 rounded-full overflow-hidden bg-gray-100">
+                <div className="flex h-6 rounded-full overflow-hidden">
                   {entry.dailySteps.map((day) => {
                     const pct = (day.steps / maxTotal) * 100;
                     return (
