@@ -61,10 +61,14 @@ export function exportRankingAsImage(
   const mode = hasHandicap ? 'ネット（ハンデ適用）ランキング' : 'グロスランキング';
   ctx.fillText(`${mode}  ·  ${jpDate(startDate)} 〜 ${jpDate(endDate)}`, PAD, 62);
 
-  // Rows
+  // Rows — effective target scales with handicapMultiplier in net mode
+  const effectiveTarget = (e: RankingEntry) => {
+    if (e.targetSteps === undefined) return 0;
+    return hasHandicap ? Math.floor(e.targetSteps * e.handicapMultiplier) : e.targetSteps;
+  };
   const maxSteps = Math.max(
     ...sorted.map((e) => hasHandicap ? e.netAverageSteps : e.averageSteps),
-    ...sorted.map((e) => e.targetSteps ?? 0),
+    ...sorted.map(effectiveTarget),
     1,
   );
   const BAR_X = W - PAD - 220;
@@ -114,14 +118,15 @@ export function exportRankingAsImage(
     ctx.fillRect(BAR_X, barY, BAR_W, 8);
 
     // Bar fill — indigo if target achieved (or no target), gray otherwise
-    const achieved = entry.targetSteps === undefined || steps >= entry.targetSteps;
+    const eTarget = effectiveTarget(entry);
+    const achieved = entry.targetSteps === undefined || steps >= eTarget;
     const fill = Math.max((steps / maxSteps) * BAR_W, 0);
     ctx.fillStyle = achieved ? '#4338CA' : '#9CA3AF';
     ctx.fillRect(BAR_X, barY, fill, 8);
 
     // Target line (red vertical line)
     if (entry.targetSteps !== undefined) {
-      const targetX = BAR_X + Math.min((entry.targetSteps / maxSteps) * BAR_W, BAR_W);
+      const targetX = BAR_X + Math.min((eTarget / maxSteps) * BAR_W, BAR_W);
       ctx.fillStyle = '#EF4444';
       ctx.fillRect(targetX - 1, barY - 4, 2, 16);
     }

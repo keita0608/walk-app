@@ -49,7 +49,10 @@ export default function RankingTable({ entries }: Props) {
 
   const maxVal = Math.max(
     ...displayEntries.map((e) => view === 'net' ? e.netAverageSteps : e.averageSteps),
-    ...displayEntries.map((e) => e.targetSteps ?? 0),
+    ...displayEntries.map((e) => {
+      if (e.targetSteps === undefined) return 0;
+      return view === 'net' ? Math.floor(e.targetSteps * e.handicapMultiplier) : e.targetSteps;
+    }),
     1,
   );
 
@@ -82,11 +85,15 @@ export default function RankingTable({ entries }: Props) {
       {/* ── Gross / Net ranking ── */}
       {view !== 'chart' && displayEntries.map((entry, idx) => {
         const displaySteps = view === 'net' ? entry.netAverageSteps : entry.averageSteps;
+        // When showing net, scale target by the same handicap multiplier
+        const effectiveTarget = entry.targetSteps !== undefined
+          ? (view === 'net' ? Math.floor(entry.targetSteps * entry.handicapMultiplier) : entry.targetSteps)
+          : undefined;
         const barPct = maxVal > 0 ? (displaySteps / maxVal) * 100 : 0;
-        const targetPct = entry.targetSteps !== undefined
-          ? Math.min((entry.targetSteps / maxVal) * 100, 100)
+        const targetPct = effectiveTarget !== undefined
+          ? Math.min((effectiveTarget / maxVal) * 100, 100)
           : null;
-        const achieved = entry.targetSteps === undefined || displaySteps >= entry.targetSteps;
+        const achieved = effectiveTarget === undefined || displaySteps >= effectiveTarget;
 
         return (
           <div key={entry.userId} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
@@ -101,7 +108,14 @@ export default function RankingTable({ entries }: Props) {
               </span>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="font-semibold text-gray-800 truncate">{entry.name}</span>
+                  <span
+                    className="font-semibold truncate"
+                    style={{
+                      color: entry.gender === 'male' ? '#3B6FD4'
+                           : entry.gender === 'female' ? '#C0588A'
+                           : '#1F2937',
+                    }}
+                  >{entry.name}</span>
                   {entry.handicapMultiplier > 1 && view === 'net' && (
                     <span className="text-xs px-1.5 py-0.5 bg-pink-100 text-pink-600 rounded">
                       ×{entry.handicapMultiplier}
