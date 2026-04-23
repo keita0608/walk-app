@@ -4,19 +4,23 @@ import { useState } from 'react';
 import { RankingEntry } from '@/lib/types';
 import { formatSteps } from '@/lib/utils/ranking';
 
-// Gradient palette harmonised with base indigo #5A45E2
-// Sun = warm mauve → progressively cooler → Sat = deep royal blue
+// Earthy warm-to-cool gradient: rust → sand → sage → teal
 export const DOW_COLORS = [
-  '#BE90BC', // 0 日 (Sun)  – muted mauve (warm, restful)
-  '#A870C8', // 1 月 (Mon)  – dusty purple
-  '#8E58D4', // 2 火 (Tue)  – medium purple
-  '#7248DC', // 3 水 (Wed)  – indigo-purple
-  '#5A45E2', // 4 木 (Thu)  – base indigo
-  '#4548DC', // 5 金 (Fri)  – blue-indigo
-  '#3055C8', // 6 土 (Sat)  – deep royal blue (cool, composed)
+  '#c7522a', // 0 日 (Sun)  – terracotta
+  '#e5c185', // 1 月 (Mon)  – warm sand
+  '#f0daa5', // 2 火 (Tue)  – light cream
+  '#b8cdab', // 3 水 (Wed)  – sage green
+  '#74a892', // 4 木 (Thu)  – muted teal
+  '#008585', // 5 金 (Fri)  – deep teal
+  '#004343', // 6 土 (Sat)  – dark teal
 ];
 
 const DOW_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+
+function shortDate(d: string) {
+  const [, m, day] = d.split('-').map(Number);
+  return `${m}/${day}`;
+}
 
 interface Props {
   entries: RankingEntry[];
@@ -24,9 +28,17 @@ interface Props {
 
 type View = 'gross' | 'net' | 'chart';
 
+interface TooltipInfo {
+  name: string;
+  date: string;
+  steps: number;
+  dow: number;
+}
+
 export default function RankingTable({ entries }: Props) {
   const hasHandicap = entries.some((e) => e.handicapMultiplier > 1);
   const [view, setView] = useState<View>('gross');
+  const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
 
   const displayEntries = [...entries].sort((a, b) =>
     view === 'net'
@@ -40,7 +52,6 @@ export default function RankingTable({ entries }: Props) {
     1,
   );
 
-  // Chart: sorted by total steps descending
   const chartEntries = [...entries].sort((a, b) => b.totalSteps - a.totalSteps);
   const maxTotal = Math.max(...chartEntries.map((e) => e.totalSteps), 1);
 
@@ -57,13 +68,12 @@ export default function RankingTable({ entries }: Props) {
 
   return (
     <div className="space-y-3">
-      {/* View toggle */}
       <div className="flex items-center gap-2 flex-wrap">
         <button onClick={() => setView('gross')} className={btnClass('gross')}>グロス</button>
         {hasHandicap && (
           <button onClick={() => setView('net')} className={btnClass('net')}>ネット（ハンデ適用）</button>
         )}
-        <button onClick={() => setView('chart')} className={btnClass('chart')}>累計グラフ</button>
+        <button onClick={() => { setView('chart'); setTooltip(null); }} className={btnClass('chart')}>累計グラフ</button>
       </div>
 
       {/* ── Gross / Net ranking ── */}
@@ -85,7 +95,6 @@ export default function RankingTable({ entries }: Props) {
               }>
                 {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`}
               </span>
-
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="font-semibold text-gray-800 truncate">{entry.name}</span>
@@ -102,15 +111,11 @@ export default function RankingTable({ entries }: Props) {
                   合計 {formatSteps(entry.totalSteps)} 歩 / {entry.submittedDays}日提出
                 </span>
               </div>
-
               <div className="text-right shrink-0">
-                <span className="text-lg font-bold text-indigo-600">
-                  {formatSteps(displaySteps)}
-                </span>
+                <span className="text-lg font-bold text-indigo-600">{formatSteps(displaySteps)}</span>
                 <span className="text-xs text-gray-400 ml-1">歩/日</span>
               </div>
             </div>
-
             <div className="relative w-full bg-gray-100 rounded-full h-3">
               <div
                 className="bg-indigo-500 h-3 rounded-full transition-all duration-500"
@@ -125,9 +130,7 @@ export default function RankingTable({ entries }: Props) {
               )}
             </div>
             {entry.targetSteps !== undefined && (
-              <p className="text-xs text-red-400 mt-1 text-right">
-                目標 {formatSteps(entry.targetSteps)} 歩
-              </p>
+              <p className="text-xs text-red-400 mt-1 text-right">目標 {formatSteps(entry.targetSteps)} 歩</p>
             )}
           </div>
         );
@@ -140,35 +143,46 @@ export default function RankingTable({ entries }: Props) {
           <div className="flex flex-wrap gap-3">
             {DOW_LABELS.map((label, i) => (
               <div key={i} className="flex items-center gap-1">
-                <span
-                  className="inline-block w-3 h-3 rounded-sm shrink-0"
-                  style={{ backgroundColor: DOW_COLORS[i] }}
-                />
+                <span className="inline-block w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: DOW_COLORS[i] }} />
                 <span className="text-xs text-gray-500">{label}曜</span>
               </div>
             ))}
           </div>
 
-          {/* Bars: one row per participant, each day = one segment */}
-          <div className="space-y-3">
+          {/* Tooltip banner */}
+          {tooltip && (
+            <div className="flex items-center justify-between bg-gray-800 text-white rounded-lg px-3 py-2 text-sm">
+              <span>
+                <span className="font-medium">{tooltip.name}</span>
+                <span className="text-gray-300 mx-1.5">·</span>
+                <span>{shortDate(tooltip.date)}（{DOW_LABELS[tooltip.dow]}曜）</span>
+                <span className="text-gray-300 mx-1.5">·</span>
+                <span className="font-bold">{formatSteps(tooltip.steps)} 歩</span>
+              </span>
+              <button onClick={() => setTooltip(null)} className="ml-3 text-gray-400 hover:text-white text-base leading-none">✕</button>
+            </div>
+          )}
+
+          {/* Bars */}
+          <div className="space-y-3" onClick={() => setTooltip(null)}>
             {chartEntries.map((entry) => (
               <div key={entry.userId}>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-medium text-gray-700 w-24 truncate shrink-0">
-                    {entry.name}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    {formatSteps(entry.totalSteps)} 歩
-                  </span>
+                  <span className="text-sm font-medium text-gray-700 w-24 truncate shrink-0">{entry.name}</span>
+                  <span className="text-xs text-gray-400">{formatSteps(entry.totalSteps)} 歩</span>
                 </div>
-                <div className="flex h-5 rounded-full overflow-hidden bg-gray-100">
+                <div className="flex h-6 rounded-full overflow-hidden bg-gray-100">
                   {entry.dailySteps.map((day) => {
                     const pct = (day.steps / maxTotal) * 100;
                     return (
                       <div
                         key={day.date}
                         style={{ width: `${pct}%`, backgroundColor: DOW_COLORS[day.dow] }}
-                        title={`${day.date}（${DOW_LABELS[day.dow]}）: ${formatSteps(day.steps)} 歩`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTooltip({ name: entry.name, date: day.date, steps: day.steps, dow: day.dow });
+                        }}
+                        className="cursor-pointer hover:brightness-90 transition-[filter]"
                       />
                     );
                   })}
@@ -179,9 +193,7 @@ export default function RankingTable({ entries }: Props) {
         </div>
       )}
 
-      <p className="text-xs text-gray-400 text-center pt-1">
-        ⚠️ = 未提出日あり（0歩として計算）
-      </p>
+      <p className="text-xs text-gray-400 text-center pt-1">⚠️ = 未提出日あり（0歩として計算）</p>
     </div>
   );
 }

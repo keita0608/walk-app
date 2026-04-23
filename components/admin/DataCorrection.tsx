@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { AppUser, StepEntry } from '@/lib/types';
+import { useState, useEffect } from 'react';
+import { AppUser } from '@/lib/types';
 import { adminUpdateStep, getStep } from '@/lib/firebase/firestore';
-import { getDateRange, displayDate } from '@/lib/utils/date';
+import { getDateRange } from '@/lib/utils/date';
 
 interface Props {
   eventId: string;
@@ -11,6 +11,19 @@ interface Props {
   startDate: string;
   endDate: string;
   onUpdated: () => void;
+}
+
+interface DayState {
+  value: string;       // current input value
+  submitted: boolean;  // has a Firestore entry
+  saving: boolean;
+  error: string;
+  saved: boolean;      // flash after save
+}
+
+function shortDate(d: string) {
+  const [, m, day] = d.split('-').map(Number);
+  return `${m}/${day}`;
 }
 
 export default function DataCorrection({
@@ -23,163 +36,121 @@ export default function DataCorrection({
   const dates = getDateRange(startDate, endDate);
 
   const [selectedUserId, setSelectedUserId] = useState('');
-  const [selectedDate, setSelectedDate] = useState('');
-  const [newSteps, setNewSteps] = useState('');
-  const [existingEntry, setExistingEntry] = useState<StepEntry | null>(null);
-  const [loadingEntry, setLoadingEntry] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [days, setDays] = useState<Record<string, DayState>>({});
 
-  const handleUserDateChange = async (userId: string, date: string) => {
-    setSelectedUserId(userId);
-    setSelectedDate(date);
-    setNewSteps('');
-    setExistingEntry(null);
-    setError('');
-    setSuccess('');
-
-    if (!userId || !date) return;
-
-    setLoadingEntry(true);
+  const loadUser = async (userId: string) => {
+    if (!userId) { setDays({}); return; }
+    setLoading(true);
     try {
-      const entry = await getStep(userId, eventId, date);
-      setExistingEntry(entry);
-      if (entry) setNewSteps(String(entry.steps));
-    } catch {
-      setError('データ取得に失敗しました');
+      const entries = await Promise.all(dates.map((d) => getStep(userId, eventId, d)));
+      const next: Record<string, DayState> = {};
+      dates.forEach((d, i) => {
+        next[d] = {
+          value: entries[i] ? String(entries[i]!.steps) : '',
+          submitted: !!entries[i],
+          saving: false,
+          error: '',
+          saved: false,
+        };
+      });
+      setDays(next);
     } finally {
-      setLoadingEntry(false);
+      setLoading(false);
     }
   };
 
-  const handleSave = async () => {
-    const val = parseInt(newSteps, 10);
+  useEffect(() => { loadUser(selectedUserId); }, [selectedUserId]);
+
+  const update = (date: string, patch: Partial<DayState>) =>
+    setDays((prev) => ({ ...prev, [date]: { ...prev[date], ...patch } }));
+
+  const handleBlur = async (date: string) => {
+    const day = days[date];
+    if (!day || !selectedUserId) return;
+    const raw = day.value.trim();
+    if (raw === '') return; // don't save empty on blur
+    const val = parseInt(raw, 10);
     if (isNaN(val) || val < 0 || val >= 100000) {
-      setError('0〜99999の整数を入力してください');
+      update(date, { error: '0〜99999の整数' });
       return;
     }
-    setSaving(true);
-    setError('');
+    update(date, { saving: true, error: '' });
     try {
-      await adminUpdateStep(selectedUserId, eventId, selectedDate, val);
-      setSuccess('更新しました');
-      setShowConfirm(false);
+      await adminUpdateStep(selectedUserId, eventId, date, val);
+      update(date, { saving: false, submitted: true, saved: true });
+      setTimeout(() => update(date, { saved: false }), 1500);
       onUpdated();
-    } catch (err: unknown) {
-      setError('更新に失敗しました: ' + (err instanceof Error ? err.message : String(err)));
-    } finally {
-      setSaving(false);
+    } catch {
+      update(date, { saving: false, error: '保存失敗' });
     }
   };
-
-  const selectedUser = participants.find((u) => u.id === selectedUserId);
 
   return (
     <div className="space-y-5">
       <h3 className="font-semibold text-gray-800">データ修正</h3>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">ユーザーを選択</label>
-          <select
-            value={selectedUserId}
-            onChange={(e) => handleUserDateChange(e.target.value, selectedDate)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">-- 選択 --</option>
-            {participants.map((u) => (
-              <option key={u.id} value={u.id}>{u.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">日付を選択</label>
-          <select
-            value={selectedDate}
-            onChange={(e) => handleUserDateChange(selectedUserId, e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            disabled={!selectedUserId}
-          >
-            <option value="">-- 選択 --</option>
-            {dates.map((d) => (
-              <option key={d} value={d}>{displayDate(d)}</option>
-            ))}
-          </select>
-        </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">ユーザーを選択</label>
+        <select
+          value={selectedUserId}
+          onChange={(e) => setSelectedUserId(e.target.value)}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          <option value="">-- 選択 --</option>
+          {participants.map((u) => (
+            <option key={u.id} value={u.id}>{u.name}</option>
+          ))}
+        </select>
       </div>
 
-      {loadingEntry && (
-        <p className="text-sm text-gray-400">読み込み中…</p>
-      )}
-
-      {selectedUserId && selectedDate && !loadingEntry && (
-        <div className="bg-gray-50 rounded-xl p-4 space-y-4">
-          <div className="text-sm text-gray-600">
-            <span className="font-medium">{selectedUser?.name}</span> ／ {displayDate(selectedDate)}
-            {existingEntry ? (
-              <span className="ml-2 text-green-600">（提出済み：{existingEntry.steps.toLocaleString()} 歩）</span>
-            ) : (
-              <span className="ml-2 text-yellow-600">（未提出）</span>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">修正後の歩数</label>
-            <input
-              type="number"
-              min={0}
-              max={99999}
-              value={newSteps}
-              onChange={(e) => setNewSteps(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="例：7500"
-            />
-          </div>
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          {success && <p className="text-sm text-green-600">{success}</p>}
-
-          <button
-            onClick={() => { setShowConfirm(true); setError(''); setSuccess(''); }}
-            disabled={!newSteps}
-            className="w-full py-2.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 font-medium disabled:bg-gray-300"
-          >
-            修正する
-          </button>
+      {loading && (
+        <div className="flex justify-center py-8">
+          <div className="animate-spin rounded-full h-6 w-6 border-4 border-indigo-500 border-t-transparent" />
         </div>
       )}
 
-      {/* Confirmation dialog */}
-      {showConfirm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full space-y-4">
-            <h3 className="font-semibold text-gray-800">修正を確認</h3>
-            <p className="text-sm text-gray-600">
-              <strong>{selectedUser?.name}</strong> の {displayDate(selectedDate)} の歩数を{' '}
-              <strong>{parseInt(newSteps).toLocaleString()} 歩</strong> に修正します。よろしいですか？
-            </p>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowConfirm(false)}
-                disabled={saving}
-                className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-              >
-                キャンセル
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex-1 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:bg-gray-300 font-medium"
-              >
-                {saving ? '更新中…' : '確定'}
-              </button>
-            </div>
-          </div>
+      {!loading && selectedUserId && dates.length > 0 && (
+        <div className="space-y-2">
+          {dates.map((date) => {
+            const day = days[date];
+            if (!day) return null;
+            const missing = !day.submitted && day.value === '';
+            return (
+              <div key={date} className="flex items-center gap-3">
+                <span className="text-sm text-gray-600 w-12 shrink-0 font-medium">
+                  {shortDate(date)}
+                </span>
+                {missing ? (
+                  <span className="text-red-500 text-base shrink-0" title="未入力">⚠️</span>
+                ) : (
+                  <span className="w-5 shrink-0" />
+                )}
+                <div className="flex items-center gap-2 flex-1">
+                  <input
+                    type="number"
+                    min={0}
+                    max={99999}
+                    value={day.value}
+                    onChange={(e) => update(date, { value: e.target.value, error: '', saved: false })}
+                    onBlur={() => handleBlur(date)}
+                    placeholder="未入力"
+                    className={`w-32 border rounded-lg px-3 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                      day.error ? 'border-red-400' : missing ? 'border-yellow-300 bg-yellow-50' : 'border-gray-300'
+                    }`}
+                  />
+                  {day.saving && <span className="text-xs text-gray-400">保存中…</span>}
+                  {day.saved && <span className="text-xs text-green-500">✓</span>}
+                  {day.error && <span className="text-xs text-red-500">{day.error}</span>}
+                </div>
+              </div>
+            );
+          })}
         </div>
+      )}
+
+      {!loading && selectedUserId && dates.length === 0 && (
+        <p className="text-sm text-gray-400 text-center py-6">対象日がありません</p>
       )}
     </div>
   );
