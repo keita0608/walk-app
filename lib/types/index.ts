@@ -9,6 +9,7 @@ export interface AppUser {
   email: string;
   role: UserRole;
   gender?: Gender;
+  apiToken?: string;
 }
 
 export interface WalkEvent {

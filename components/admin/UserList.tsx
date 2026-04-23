@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { AppUser, UserRole, Gender } from '@/lib/types';
-import { updateUser } from '@/lib/firebase/firestore';
+import { updateUser, saveApiToken } from '@/lib/firebase/firestore';
 
 interface Props {
   users: AppUser[];
@@ -10,9 +10,11 @@ interface Props {
 }
 
 export default function UserList({ users, onUpdated }: Props) {
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName]   = useState('');
-  const [editRole, setEditRole]   = useState<UserRole>('user');
+  const [editingId, setEditingId]       = useState<string | null>(null);
+  const [editName, setEditName]         = useState('');
+  const [editRole, setEditRole]         = useState<UserRole>('user');
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId]         = useState<string | null>(null);
   const [editGender, setEditGender] = useState<Gender | ''>('');
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState('');
@@ -50,6 +52,23 @@ export default function UserList({ users, onUpdated }: Props) {
 
   const genderLabel = (g?: Gender) =>
     g === 'male' ? '男性' : g === 'female' ? '女性' : '—';
+
+  const handleGenerateToken = async (userId: string) => {
+    setGeneratingId(userId);
+    try {
+      const token = crypto.randomUUID();
+      await saveApiToken(userId, token);
+      onUpdated();
+    } finally {
+      setGeneratingId(null);
+    }
+  };
+
+  const handleCopy = (text: string, userId: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(userId);
+    setTimeout(() => setCopiedId(null), 1500);
+  };
 
   return (
     <div className="space-y-3">
@@ -135,6 +154,39 @@ export default function UserList({ users, onUpdated }: Props) {
               >
                 編集
               </button>
+            </div>
+
+            {/* API token row */}
+            <div className="mt-2 pt-2 border-t border-gray-50 flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-gray-400 shrink-0">iOSトークン：</span>
+              {user.apiToken ? (
+                <>
+                  <code className="text-xs bg-gray-100 px-2 py-0.5 rounded font-mono truncate max-w-[180px]">
+                    {user.apiToken}
+                  </code>
+                  <button
+                    onClick={() => handleCopy(user.apiToken!, user.id)}
+                    className="text-xs text-indigo-500 hover:text-indigo-700 shrink-0"
+                  >
+                    {copiedId === user.id ? 'コピー済み ✓' : 'コピー'}
+                  </button>
+                  <button
+                    onClick={() => handleGenerateToken(user.id)}
+                    disabled={generatingId === user.id}
+                    className="text-xs text-gray-400 hover:text-gray-600 shrink-0"
+                  >
+                    再発行
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => handleGenerateToken(user.id)}
+                  disabled={generatingId === user.id}
+                  className="text-xs px-2 py-0.5 border border-indigo-300 text-indigo-600 rounded hover:bg-indigo-50 shrink-0"
+                >
+                  {generatingId === user.id ? '発行中…' : 'トークンを発行'}
+                </button>
+              )}
             </div>
           )}
         </div>
