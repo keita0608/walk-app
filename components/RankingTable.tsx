@@ -143,12 +143,12 @@ export default function RankingTable({ entries }: Props) {
                 <div
                   className="absolute top-1/2 -translate-y-1/2 w-0.5 h-5 bg-red-500"
                   style={{ left: `${targetPct}%` }}
-                  title={`目標: ${formatSteps(entry.targetSteps!)} 歩`}
+                  title={`目標: ${formatSteps(effectiveTarget!)} 歩`}
                 />
               )}
             </div>
-            {entry.targetSteps !== undefined && (
-              <p className="text-xs text-red-400 mt-1 text-right">目標 {formatSteps(entry.targetSteps)} 歩</p>
+            {effectiveTarget !== undefined && (
+              <p className="text-xs text-red-400 mt-1 text-right">目標 {formatSteps(effectiveTarget)} 歩</p>
             )}
           </div>
         );
@@ -190,7 +190,7 @@ export default function RankingTable({ entries }: Props) {
                   <span className="text-xs text-gray-400">{formatSteps(entry.totalSteps)} 歩</span>
                 </div>
                 {/* Outer track (gray bg, full width, rounded) */}
-                <div className="relative h-6 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div className="relative h-6 w-full rounded-full overflow-hidden">
                   {/* Inner bar: only as wide as this participant's total — gives rounded right end */}
                   <div
                     className="flex h-6 rounded-full overflow-hidden absolute inset-y-0 left-0"
