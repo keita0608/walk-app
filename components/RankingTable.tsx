@@ -4,15 +4,16 @@ import { useState } from 'react';
 import { RankingEntry } from '@/lib/types';
 import { formatSteps } from '@/lib/utils/ranking';
 
-// Day-of-week colors: index 0=Sun, 1=Mon, ..., 6=Sat
+// Gradient palette harmonised with base indigo #5A45E2
+// Flows from royal blue → blue-indigo → indigo → purple → dusty purple → mauve
 export const DOW_COLORS = [
-  '#EF4444', // 0 日 (Sun)
-  '#3B82F6', // 1 月 (Mon)
-  '#F59E0B', // 2 火 (Tue)
-  '#10B981', // 3 水 (Wed)
-  '#8B5CF6', // 4 木 (Thu)
-  '#EC4899', // 5 金 (Fri)
-  '#0EA5E9', // 6 土 (Sat)
+  '#3055C8', // 0 日 (Sun)  – deep royal blue
+  '#4548DC', // 1 月 (Mon)  – blue-indigo
+  '#5A45E2', // 2 火 (Tue)  – base indigo
+  '#7248DC', // 3 水 (Wed)  – indigo-purple
+  '#8E58D4', // 4 木 (Thu)  – medium purple
+  '#A870C8', // 5 金 (Fri)  – dusty purple
+  '#BE90BC', // 6 土 (Sat)  – muted mauve
 ];
 
 const DOW_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
@@ -39,7 +40,7 @@ export default function RankingTable({ entries }: Props) {
     1,
   );
 
-  // For stacked chart: sort by total steps descending
+  // Chart: sorted by total steps descending
   const chartEntries = [...entries].sort((a, b) => b.totalSteps - a.totalSteps);
   const maxTotal = Math.max(...chartEntries.map((e) => e.totalSteps), 1);
 
@@ -65,7 +66,7 @@ export default function RankingTable({ entries }: Props) {
         <button onClick={() => setView('chart')} className={btnClass('chart')}>累計グラフ</button>
       </div>
 
-      {/* Gross / Net ranking */}
+      {/* ── Gross / Net ranking ── */}
       {view !== 'chart' && displayEntries.map((entry, idx) => {
         const displaySteps = view === 'net' ? entry.netAverageSteps : entry.averageSteps;
         const barPct = maxVal > 0 ? (displaySteps / maxVal) * 100 : 0;
@@ -132,7 +133,7 @@ export default function RankingTable({ entries }: Props) {
         );
       })}
 
-      {/* Stacked bar chart view */}
+      {/* ── Cumulative stacked bar chart ── */}
       {view === 'chart' && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-4">
           {/* Legend */}
@@ -140,7 +141,7 @@ export default function RankingTable({ entries }: Props) {
             {DOW_LABELS.map((label, i) => (
               <div key={i} className="flex items-center gap-1">
                 <span
-                  className="inline-block w-3 h-3 rounded-sm"
+                  className="inline-block w-3 h-3 rounded-sm shrink-0"
                   style={{ backgroundColor: DOW_COLORS[i] }}
                 />
                 <span className="text-xs text-gray-500">{label}曜</span>
@@ -148,43 +149,32 @@ export default function RankingTable({ entries }: Props) {
             ))}
           </div>
 
-          {/* Bars */}
+          {/* Bars: one row per participant, each day = one segment */}
           <div className="space-y-3">
-            {chartEntries.map((entry) => {
-              const totalForBar = entry.stepsByDayOfWeek.reduce((a, b) => a + b, 0);
-              return (
-                <div key={entry.userId}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium text-gray-700 w-24 truncate shrink-0">
-                      {entry.name}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      {formatSteps(entry.totalSteps)} 歩
-                    </span>
-                  </div>
-                  <div className="flex h-5 rounded-full overflow-hidden bg-gray-100">
-                    {entry.stepsByDayOfWeek.map((steps, dow) => {
-                      const pct = maxTotal > 0 ? (steps / maxTotal) * 100 : 0;
-                      if (pct === 0) return null;
-                      return (
-                        <div
-                          key={dow}
-                          style={{ width: `${pct}%`, backgroundColor: DOW_COLORS[dow] }}
-                          title={`${DOW_LABELS[dow]}曜: ${formatSteps(steps)} 歩`}
-                        />
-                      );
-                    })}
-                    {/* Remaining empty space */}
-                    {totalForBar < maxTotal && (
-                      <div
-                        style={{ width: `${((maxTotal - totalForBar) / maxTotal) * 100}%` }}
-                        className="bg-gray-100"
-                      />
-                    )}
-                  </div>
+            {chartEntries.map((entry) => (
+              <div key={entry.userId}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm font-medium text-gray-700 w-24 truncate shrink-0">
+                    {entry.name}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {formatSteps(entry.totalSteps)} 歩
+                  </span>
                 </div>
-              );
-            })}
+                <div className="flex h-5 rounded-full overflow-hidden bg-gray-100">
+                  {entry.dailySteps.map((day) => {
+                    const pct = (day.steps / maxTotal) * 100;
+                    return (
+                      <div
+                        key={day.date}
+                        style={{ width: `${pct}%`, backgroundColor: DOW_COLORS[day.dow] }}
+                        title={`${day.date}（${DOW_LABELS[day.dow]}）: ${formatSteps(day.steps)} 歩`}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

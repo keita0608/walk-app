@@ -57,5 +57,5 @@ export interface RankingEntry {
   hasMissingData: boolean;
   targetSteps?: number;
   handicapMultiplier: number;
-  stepsByDayOfWeek: number[]; // index 0=Sun, 1=Mon, ..., 6=Sat
+  dailySteps: { date: string; steps: number; dow: number }[];
 }

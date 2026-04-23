@@ -28,13 +28,14 @@ export function computeRankings(
     const netAverageSteps = Math.floor(averageSteps * handicapMultiplier);
     const hasMissingData = dateRange.some((d) => !submittedDates.has(d));
 
-    // Aggregate steps by day of week (0=Sun..6=Sat)
-    const stepsByDayOfWeek = [0, 0, 0, 0, 0, 0, 0];
-    for (const s of userSteps) {
-      const [y, m, d] = s.date.split('-').map(Number);
-      const dow = new Date(y, m - 1, d).getDay();
-      stepsByDayOfWeek[dow] += s.steps;
-    }
+    // Daily steps ordered by date, each tagged with day-of-week index (0=Sun..6=Sat)
+    const dailySteps = [...userSteps]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((s) => {
+        const [y, m, d] = s.date.split('-').map(Number);
+        const dow = new Date(y, m - 1, d).getDay();
+        return { date: s.date, steps: s.steps, dow };
+      });
 
     return {
       userId: user.id,
@@ -48,7 +49,7 @@ export function computeRankings(
       hasMissingData,
       targetSteps,
       handicapMultiplier,
-      stepsByDayOfWeek,
+      dailySteps,
     };
   });
 }
