@@ -89,11 +89,17 @@ export default function UsersPage() {
                 <ol className="space-y-2 text-gray-500 list-decimal list-inside">
                   <li>iPhone の「ショートカット」アプリを開く</li>
                   <li>右上の <strong>＋</strong> をタップ → 「アクションを追加」</li>
-                  <li>「<strong>ヘルスケアサンプルを取得</strong>」を検索して追加
+                  <li>「<strong>ヘルスケアサンプルを検索</strong>」を検索して追加
                     <ul className="list-disc list-inside ml-4 mt-1 text-xs text-gray-400">
                       <li>種類：<strong>歩数</strong></li>
                       <li>期間：<strong>昨日</strong></li>
-                      <li>集計：<strong>合計</strong></li>
+                      <li>並び替え・上限などはデフォルトのまま</li>
+                    </ul>
+                  </li>
+                  <li>「<strong>統計を計算</strong>」アクションを追加（前のステップの結果が自動で入力に入ります）
+                    <ul className="list-disc list-inside ml-4 mt-1 text-xs text-gray-400">
+                      <li>統計：<strong>合計</strong></li>
+                      <li>入力：ヘルスケアサンプルの「<strong>値</strong>」</li>
                     </ul>
                   </li>
                   <li>「<strong>URLの内容を取得</strong>」アクションを追加
@@ -103,7 +109,7 @@ export default function UsersPage() {
                       <li>本文：<strong>JSON</strong> を選択</li>
                       <li>JSONキーを追加：<br />
                         <code className="bg-gray-100 px-1 rounded">token</code> → 発行されたトークン（文字列）<br />
-                        <code className="bg-gray-100 px-1 rounded">steps</code> → ヘルスケアサンプルの結果（数値）
+                        <code className="bg-gray-100 px-1 rounded">steps</code> → 「統計を計算」の結果（数値）
                       </li>
                     </ul>
                   </li>
