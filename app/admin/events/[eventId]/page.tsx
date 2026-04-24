@@ -20,7 +20,7 @@ import {
   updateParticipant,
 } from '@/lib/firebase/firestore';
 import { computeRankings } from '@/lib/utils/ranking';
-import { displayDate } from '@/lib/utils/date';
+import { displayDate, getRankingCutoffDate } from '@/lib/utils/date';
 import { EventStatus } from '@/lib/types';
 import { exportRankingAsImage } from '@/lib/utils/exportRanking';
 
@@ -73,7 +73,7 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
       const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
       const pUsers = rawParticipants.map((p) => userMap[p.userId]).filter(Boolean) as AppUser[];
       setParticipants(pUsers);
-      setEntries(computeRankings(pUsers, rawParticipants, steps, ev.startDate, ev.endDate));
+      setEntries(computeRankings(pUsers, rawParticipants, steps, ev.startDate, ev.endDate, getRankingCutoffDate()));
     } finally {
       setLoading(false);
     }

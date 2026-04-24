@@ -31,6 +31,14 @@ export function isSubmissionAllowed(): boolean {
   return h < 11 || (h === 11 && m < 30);
 }
 
+// Before 12:00 JST: cutoff is day-before-yesterday; after 12:00: cutoff is yesterday
+export function getRankingCutoffDate(): string {
+  const jst = getJSTNow();
+  const daysBack = jst.getHours() < 12 ? 2 : 1;
+  jst.setDate(jst.getDate() - daysBack);
+  return formatDateStr(jst);
+}
+
 // Number of days from startDate through yesterday (inclusive).
 export function getElapsedDays(startDate: string): number {
   const jst = getJSTNow();
