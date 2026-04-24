@@ -11,9 +11,13 @@ export function computeRankings(
   steps: StepEntry[],
   startDate: string,
   endDate?: string,
+  cutoffDate?: string,
 ): RankingEntry[] {
-  const elapsedDays = getElapsedDays(startDate);
-  const dateRange = getDateRange(startDate, endDate);
+  const effectiveEnd = cutoffDate && endDate
+    ? (cutoffDate < endDate ? cutoffDate : endDate)
+    : (cutoffDate ?? endDate);
+  const dateRange = getDateRange(startDate, effectiveEnd);
+  const elapsedDays = dateRange.length;
   const participantMap = Object.fromEntries(participantData.map((p) => [p.userId, p]));
 
   return participants.map((user) => {
@@ -21,7 +25,9 @@ export function computeRankings(
     const handicapMultiplier = pData?.handicapMultiplier ?? 1;
     const targetSteps = pData?.targetSteps;
 
-    const userSteps = steps.filter((s) => s.userId === user.id);
+    const userSteps = steps
+      .filter((s) => s.userId === user.id)
+      .filter((s) => !cutoffDate || s.date <= cutoffDate);
     const submittedDates = new Set(userSteps.map((s) => s.date));
     const totalSteps = userSteps.reduce((sum, s) => sum + s.steps, 0);
     const averageSteps = elapsedDays > 0 ? Math.floor(totalSteps / elapsedDays) : 0;

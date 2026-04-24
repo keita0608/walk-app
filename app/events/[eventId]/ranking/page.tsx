@@ -7,7 +7,7 @@ import RankingTable from '@/components/RankingTable';
 import { WalkEvent, AppUser, RankingEntry } from '@/lib/types';
 import { getEvent, getEventParticipants, getStepsByEvent, getUsers } from '@/lib/firebase/firestore';
 import { computeRankings } from '@/lib/utils/ranking';
-import { displayDate } from '@/lib/utils/date';
+import { displayDate, getRankingCutoffDate } from '@/lib/utils/date';
 
 export default function RankingPage({ params }: { params: { eventId: string } }) {
   const { eventId } = params;
@@ -32,7 +32,7 @@ export default function RankingPage({ params }: { params: { eventId: string } })
         .map((p) => userMap[p.userId])
         .filter(Boolean) as AppUser[];
 
-      setEntries(computeRankings(participantUsers, participants, steps, ev.startDate, ev.endDate));
+      setEntries(computeRankings(participantUsers, participants, steps, ev.startDate, ev.endDate, getRankingCutoffDate()));
     } finally {
       setLoading(false);
     }
