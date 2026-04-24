@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import AuthGuard from '@/components/AuthGuard';
 import RankingTable from '@/components/RankingTable';
 import DataCorrection from '@/components/admin/DataCorrection';
-import { WalkEvent, AppUser, EventParticipant, RankingEntry, Team } from '@/lib/types';
+import SubmissionStatus from '@/components/admin/SubmissionStatus';
+import { WalkEvent, AppUser, EventParticipant, RankingEntry, Team, StepEntry } from '@/lib/types';
 import {
   getEvent,
   getEventParticipants,
@@ -24,7 +25,7 @@ import { displayDate, getRankingCutoffDate } from '@/lib/utils/date';
 import { EventStatus } from '@/lib/types';
 import { exportRankingAsImage } from '@/lib/utils/exportRanking';
 
-type Tab = 'ranking' | 'participants' | 'correction';
+type Tab = 'ranking' | 'participants' | 'correction' | 'submission';
 
 export default function AdminEventPage({ params }: { params: { eventId: string } }) {
   const { eventId } = params;
@@ -36,6 +37,7 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
   const [allParticipants, setAllParticipants] = useState<EventParticipant[]>([]);
   const [teams, setTeams]               = useState<Team[]>([]);
   const [entries, setEntries]           = useState<RankingEntry[]>([]);
+  const [allSteps, setAllSteps]         = useState<StepEntry[]>([]);
   const [tab, setTab]                   = useState<Tab>('ranking');
   const [loading, setLoading]           = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -73,6 +75,7 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
       const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
       const pUsers = rawParticipants.map((p) => userMap[p.userId]).filter(Boolean) as AppUser[];
       setParticipants(pUsers);
+      setAllSteps(steps);
       setEntries(computeRankings(pUsers, rawParticipants, steps, ev.startDate, ev.endDate, getRankingCutoffDate()));
     } finally {
       setLoading(false);
@@ -205,9 +208,10 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
 
             {/* Tabs */}
             <div className="flex border-b border-gray-200 -mb-2">
-              <button className={tabClass('ranking')}      onClick={() => setTab('ranking')}>ランキング</button>
+              <button className={tabClass('ranking')}    onClick={() => setTab('ranking')}>ランキング</button>
               <button className={tabClass('participants')} onClick={() => setTab('participants')}>参加者</button>
               <button className={tabClass('correction')}  onClick={() => setTab('correction')}>データ修正</button>
+              <button className={tabClass('submission')}  onClick={() => setTab('submission')}>提出状況</button>
             </div>
 
             {/* ── Ranking tab ── */}
@@ -360,6 +364,16 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
                 startDate={event.startDate}
                 endDate={event.endDate}
                 onUpdated={load}
+              />
+            )}
+
+            {/* ── Submission status tab ── */}
+            {tab === 'submission' && (
+              <SubmissionStatus
+                participants={participants}
+                steps={allSteps}
+                startDate={event.startDate}
+                endDate={event.endDate}
               />
             )}
 
