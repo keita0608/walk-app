@@ -30,7 +30,7 @@ service cloud.firestore {
         request.resource.data.role == 'user';
       allow update: if isAdmin() ||
         (isAuth() && request.auth.uid == userId &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'journeyRouteId', 'journeyRouteStartDate']));
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'journeyRouteId', 'journeyRouteStartDate', 'journeyCompletions']));
       allow delete: if isAdmin();
     }
 

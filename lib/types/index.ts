@@ -12,6 +12,7 @@ export interface AppUser {
   apiToken?: string;
   journeyRouteId?: string;
   journeyRouteStartDate?: string;
+  journeyCompletions?: Record<string, number>;
 }
 
 export interface WalkEvent {

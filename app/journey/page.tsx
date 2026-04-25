@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
-import { getStepsByUser, setJourneyRoute } from '@/lib/firebase/firestore';
+import { getStepsByUser, setJourneyRoute, recordJourneyCompletion } from '@/lib/firebase/firestore';
 import { computePosition, stepsToKm, JourneyPosition } from '@/lib/utils/journey';
 import { ROUTES, Route } from '@/lib/data/routes';
 import { getTodayJST } from '@/lib/utils/date';
@@ -23,6 +23,7 @@ export default function JourneyPage() {
   const [routeSteps, setRouteSteps]       = useState(0);
   const [loading, setLoading]             = useState(true);
   const [selecting, setSelecting]         = useState(false);
+  const [completions, setCompletions]     = useState<Record<string, number>>({});
 
   const loadJourney = async (route: Route, startDate: string) => {
     if (!user) return;
@@ -43,6 +44,7 @@ export default function JourneyPage() {
 
   useEffect(() => {
     if (!user) return;
+    setCompletions(user.journeyCompletions ?? {});
     const route = ROUTES.find((r) => r.id === user.journeyRouteId) ?? null;
     setSelectedRoute(route);
     if (route) {
@@ -68,6 +70,11 @@ export default function JourneyPage() {
   };
 
   const handleNextRoute = async () => {
+    if (!user || !selectedRoute) return;
+    await recordJourneyCompletion(user.id, selectedRoute.id);
+    await setJourneyRoute(user.id, null);
+    const next = { ...completions, [selectedRoute.id]: (completions[selectedRoute.id] ?? 0) + 1 };
+    setCompletions(next);
     setSelectedRoute(null);
     setPosition(null);
     setRouteSteps(0);
@@ -97,31 +104,41 @@ export default function JourneyPage() {
               ルートを選択してください。選択後はゴールするまで変更できません。
             </p>
             <div className="space-y-3">
-              {ROUTES.map((route) => {
-                const first = route.stations[0];
-                const last  = route.stations[route.stations.length - 1];
-                return (
-                  <button
-                    key={route.id}
-                    onClick={() => handleSelectRoute(route, position?.completed)}
-                    disabled={selecting}
-                    className="w-full text-left bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:border-indigo-300 transition-colors disabled:opacity-50"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-gray-800">{route.name}</p>
-                        <p className="text-sm text-gray-400 mt-0.5">
-                          {first.name} → {last.name}
-                        </p>
+              {[...ROUTES]
+                .sort((a, b) => a.stations[a.stations.length - 1].km - b.stations[b.stations.length - 1].km)
+                .map((route) => {
+                  const first = route.stations[0];
+                  const last  = route.stations[route.stations.length - 1];
+                  const count = completions[route.id] ?? 0;
+                  return (
+                    <button
+                      key={route.id}
+                      onClick={() => handleSelectRoute(route, position?.completed)}
+                      disabled={selecting}
+                      className="w-full text-left bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:border-indigo-300 transition-colors disabled:opacity-50"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-gray-800">{route.name}</p>
+                            {count > 0 && (
+                              <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">
+                                🏆 {count}回
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-400 mt-0.5">
+                            {first.name} → {last.name}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-lg font-bold text-indigo-600">{fmt(last.km)} km</p>
+                          <p className="text-xs text-gray-400">{route.stations.length}駅</p>
+                        </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-lg font-bold text-indigo-600">{fmt(last.km)} km</p>
-                        <p className="text-xs text-gray-400">{route.stations.length}駅</p>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+                    </button>
+                  );
+                })}
             </div>
           </div>
 

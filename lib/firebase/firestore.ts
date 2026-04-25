@@ -50,6 +50,14 @@ export async function saveApiToken(userId: string, token: string): Promise<void>
   await updateDoc(doc(db, 'users', userId), { apiToken: token });
 }
 
+export async function recordJourneyCompletion(userId: string, routeId: string): Promise<void> {
+  const userSnap = await getDoc(doc(db, 'users', userId));
+  const current = (userSnap.data()?.journeyCompletions as Record<string, number>) ?? {};
+  await updateDoc(doc(db, 'users', userId), {
+    journeyCompletions: { ...current, [routeId]: (current[routeId] ?? 0) + 1 },
+  });
+}
+
 export async function setJourneyRoute(
   userId: string,
   routeId: string | null,
