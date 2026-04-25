@@ -11,6 +11,11 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function isDeveloper() {
+      return isAuth() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'developer';
+    }
+
     // Deadline: 11:30 JST = 690 minutes since midnight JST
     function isBeforeDeadlineJST() {
       let jstMs = request.time.toMillis() + 9 * 60 * 60 * 1000;
@@ -46,7 +51,7 @@ service cloud.firestore {
 
     match /steps/{stepId} {
       allow read: if isAuth();
-      allow create: if isAdmin() || (isAuth() &&
+      allow create: if isAdmin() || isDeveloper() || (isAuth() &&
         request.auth.uid == request.resource.data.userId &&
         isBeforeDeadlineJST() &&
         request.resource.data.steps is int &&
