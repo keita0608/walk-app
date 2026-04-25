@@ -222,21 +222,27 @@ export default function JourneyPage() {
                   )}
                 </div>
                 {(() => {
-                  const midKm = position.routeKm / 2;
-                  const mid = selectedRoute.stations.reduce((best, s) =>
-                    Math.abs(s.km - midKm) < Math.abs(best.km - midKm) ? s : best
-                  );
+                  const midStation = selectedRoute.midStationName
+                    ? selectedRoute.stations.find((s) => s.name === selectedRoute.midStationName)
+                    : (() => {
+                        const midKm = position.routeKm / 2;
+                        return selectedRoute.stations.reduce((best, s) =>
+                          Math.abs(s.km - midKm) < Math.abs(best.km - midKm) ? s : best
+                        );
+                      })();
                   return (
                     <div className="relative h-6 mt-1">
                       <span className="absolute left-0 text-xs text-gray-500">
                         {selectedRoute.stations[0].name}
                       </span>
-                      <span
-                        className="absolute text-xs text-gray-500 -translate-x-1/2"
-                        style={{ left: `${(mid.km / position.routeKm) * 100}%` }}
-                      >
-                        {mid.name}
-                      </span>
+                      {midStation && (
+                        <span
+                          className="absolute text-xs text-gray-500 -translate-x-1/2"
+                          style={{ left: `${(midStation.km / position.routeKm) * 100}%` }}
+                        >
+                          {midStation.name}
+                        </span>
+                      )}
                       <span className="absolute right-0 text-xs text-gray-500">
                         {selectedRoute.stations[selectedRoute.stations.length - 1].name}
                       </span>

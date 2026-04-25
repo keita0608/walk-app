@@ -7,13 +7,15 @@ export interface Route {
   id: string;
   name: string;
   stations: Station[];
-  icon?: string;     // default '🚅'
-  flipIcon?: boolean; // default true (trains face left)
+  icon?: string;          // default '🚅'
+  flipIcon?: boolean;     // default true (trains face left)
+  midStationName?: string; // label shown at midpoint of progress bar
 }
 
 export const TOKAIDO: Route = {
   id: 'tokaido',
   name: '東海道新幹線',
+  midStationName: '名古屋',
   stations: [
     { name: '東京',    km: 0 },
     { name: '品川',    km: 6.8 },
@@ -38,6 +40,7 @@ export const TOKAIDO: Route = {
 export const TOHOKU: Route = {
   id: 'tohoku',
   name: '東北新幹線',
+  midStationName: '仙台',
   stations: [
     { name: '東京',           km: 0 },
     { name: '上野',           km: 3.6 },
@@ -71,6 +74,7 @@ export const TOHOKU: Route = {
 export const JOETSU: Route = {
   id: 'joetsu',
   name: '上越新幹線',
+  midStationName: '高崎',
   stations: [
     { name: '東京',       km: 0 },
     { name: '上野',       km: 3.6 },
@@ -90,6 +94,7 @@ export const JOETSU: Route = {
 export const KYUSHU: Route = {
   id: 'kyushu',
   name: '九州新幹線',
+  midStationName: '熊本',
   stations: [
     { name: '博多',       km: 0 },
     { name: '新鳥栖',     km: 26.3 },
@@ -109,6 +114,7 @@ export const KYUSHU: Route = {
 export const YAMANOTE: Route = {
   id: 'yamanote',
   name: '山手線',
+  midStationName: '新宿',
   stations: [
     { name: '東京',           km: 0 },
     { name: '神田',           km: 1.3 },
