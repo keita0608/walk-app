@@ -176,6 +176,12 @@ function toStepEntry(id: string, data: Record<string, unknown>): StepEntry {
   };
 }
 
+export async function getStepsByUser(userId: string): Promise<StepEntry[]> {
+  const q = query(collection(db, 'steps'), where('userId', '==', userId));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => toStepEntry(d.id, d.data()));
+}
+
 export async function getStepsByDateRange(startDate: string, endDate: string): Promise<StepEntry[]> {
   const q = query(
     collection(db, 'steps'),

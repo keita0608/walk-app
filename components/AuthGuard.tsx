@@ -26,7 +26,7 @@ export default function AuthGuard({ children, requireAdmin = false }: Props) {
       return;
     }
     if (user.role === 'user') {
-      getMaintenanceMode().then(setMaintenance);
+      getMaintenanceMode().then(setMaintenance).catch(() => setMaintenance(false));
     } else {
       setMaintenance(false);
     }
