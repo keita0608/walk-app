@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { AppUser, UserRole, Gender } from '@/lib/types';
 import { updateUser, saveApiToken } from '@/lib/firebase/firestore';
+import UserDataCorrection from './UserDataCorrection';
 
 interface Props {
   users: AppUser[];
@@ -10,7 +11,8 @@ interface Props {
 }
 
 export default function UserList({ users, onUpdated }: Props) {
-  const [editingId, setEditingId]       = useState<string | null>(null);
+  const [editingId, setEditingId]         = useState<string | null>(null);
+  const [correctionId, setCorrectionId] = useState<string | null>(null);
   const [editName, setEditName]         = useState('');
   const [editRole, setEditRole]         = useState<UserRole>('user');
   const [generatingId, setGeneratingId] = useState<string | null>(null);
@@ -20,6 +22,7 @@ export default function UserList({ users, onUpdated }: Props) {
   const [error, setError]         = useState('');
 
   const startEdit = (user: AppUser) => {
+    setCorrectionId(null);
     setEditingId(user.id);
     setEditName(user.name);
     setEditRole(user.role);
@@ -152,12 +155,20 @@ export default function UserList({ users, onUpdated }: Props) {
                 </div>
                 <p className="text-xs text-gray-400 truncate">{user.email}</p>
               </div>
-              <button
-                onClick={() => startEdit(user)}
-                className="text-sm text-indigo-600 hover:text-indigo-800 shrink-0"
-              >
-                編集
-              </button>
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  onClick={() => setCorrectionId(correctionId === user.id ? null : user.id)}
+                  className="text-sm text-amber-600 hover:text-amber-800"
+                >
+                  データ修正
+                </button>
+                <button
+                  onClick={() => startEdit(user)}
+                  className="text-sm text-indigo-600 hover:text-indigo-800"
+                >
+                  編集
+                </button>
+              </div>
             </div>
 
             {/* API token row */}
@@ -192,6 +203,12 @@ export default function UserList({ users, onUpdated }: Props) {
                 </button>
               )}
             </div>
+            {correctionId === user.id && (
+              <UserDataCorrection
+                userId={user.id}
+                onClose={() => setCorrectionId(null)}
+              />
+            )}
             </>
           )}
         </div>

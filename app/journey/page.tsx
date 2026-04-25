@@ -116,20 +116,17 @@ export default function JourneyPage() {
                   )}
                 </div>
 
-                {/* Station labels — show only key ones to avoid crowding */}
-                <div className="relative h-6">
-                  {[route.stations[0], route.stations[route.stations.length - 1]].map((s) => {
-                    const pct = (s.km / routeKm) * 100;
-                    return (
-                      <span
-                        key={s.name}
-                        className="absolute text-xs text-gray-500 -translate-x-1/2"
-                        style={{ left: `${pct}%` }}
-                      >
-                        {s.name}
-                      </span>
-                    );
-                  })}
+                {/* Station labels */}
+                <div className="relative h-6 mt-1">
+                  <span className="absolute left-0 text-xs text-gray-500">東京</span>
+                  {/* 名古屋 as midpoint reference */}
+                  <span
+                    className="absolute text-xs text-gray-500 -translate-x-1/2"
+                    style={{ left: `${(342 / routeKm) * 100}%` }}
+                  >
+                    名古屋
+                  </span>
+                  <span className="absolute right-0 text-xs text-gray-500">新大阪</span>
                 </div>
               </div>
             </div>
