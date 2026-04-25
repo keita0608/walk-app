@@ -17,6 +17,14 @@ import { AppUser, WalkEvent, EventParticipant, Team, StepEntry } from '@/lib/typ
 
 type ParticipantUpdate = Partial<Pick<EventParticipant, 'targetSteps' | 'handicapMultiplier'>>;
 
+// ─── Config ──────────────────────────────────────────────────────────────────
+
+export async function getMaintenanceMode(): Promise<boolean> {
+  const snap = await getDoc(doc(db, 'config', 'maintenance'));
+  if (!snap.exists()) return false;
+  return snap.data().enabled === true;
+}
+
 // ─── Users ───────────────────────────────────────────────────────────────────
 
 export async function getUser(userId: string): Promise<AppUser | null> {
