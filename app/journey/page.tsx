@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
-import { getStepsByUser, setJourneyRoute, recordJourneyCompletion } from '@/lib/firebase/firestore';
+import { getStepsByUser, getUsers, setJourneyRoute, recordJourneyCompletion } from '@/lib/firebase/firestore';
 import { computePosition, stepsToKm, JourneyPosition } from '@/lib/utils/journey';
 import { ROUTES, Route } from '@/lib/data/routes';
 import { getTodayJST } from '@/lib/utils/date';
@@ -30,12 +30,16 @@ export default function JourneyPage() {
   const [loading, setLoading]             = useState(true);
   const [selecting, setSelecting]         = useState(false);
   const [completions, setCompletions]     = useState<Record<string, number>>({});
+  const [otherUsers, setOtherUsers]       = useState<{ name: string; pct: number }[]>([]);
 
   const loadJourney = async (route: Route, startDate: string) => {
     if (!user) return;
     setLoading(true);
     try {
-      const steps = await getStepsByUser(user.id);
+      const [steps, allUsers] = await Promise.all([
+        getStepsByUser(user.id),
+        getUsers(),
+      ]);
       const total = steps.reduce((sum, s) => sum + s.steps, 0);
       const forRoute = steps
         .filter((s) => s.date >= startDate)
@@ -43,6 +47,23 @@ export default function JourneyPage() {
       setTotalSteps(total);
       setRouteSteps(forRoute);
       setPosition(computePosition(stepsToKm(forRoute), route));
+
+      const sameRouteUsers = allUsers.filter(
+        (u) => u.id !== user.id && u.journeyRouteId === route.id,
+      );
+      const others = await Promise.all(
+        sameRouteUsers.map(async (u) => {
+          const theirSteps = await getStepsByUser(u.id);
+          const theirKm = stepsToKm(
+            theirSteps
+              .filter((s) => s.date >= (u.journeyRouteStartDate ?? '2000-01-01'))
+              .reduce((sum, s) => sum + s.steps, 0),
+          );
+          const pos = computePosition(theirKm, route);
+          return { name: u.name, pct: Math.min(pos.pct, 100) };
+        }),
+      );
+      setOtherUsers(others);
     } finally {
       setLoading(false);
     }
@@ -84,6 +105,7 @@ export default function JourneyPage() {
     setSelectedRoute(null);
     setPosition(null);
     setRouteSteps(0);
+    setOtherUsers([]);
     setLoading(false);
   };
 
@@ -214,12 +236,26 @@ export default function JourneyPage() {
                   })}
                   {!position.completed && (
                     <div
-                      className="absolute top-1/2 -translate-y-1/2 text-lg leading-none"
+                      className="absolute top-1/2 -translate-y-1/2 text-lg leading-none z-20"
                       style={{ left: `${position.pct}%`, transform: 'translateY(-50%) translateX(-50%)' }}
                     >
                       <RouteIcon route={selectedRoute} />
                     </div>
                   )}
+                  {otherUsers.map((other, i) => (
+                    <React.Fragment key={i}>
+                      <div
+                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-amber-400 border-2 border-amber-500 z-10"
+                        style={{ left: `${other.pct}%` }}
+                      />
+                      <div
+                        className="absolute -translate-x-1/2 text-xs text-amber-600 whitespace-nowrap font-medium"
+                        style={{ left: `${other.pct}%`, bottom: 'calc(100% + 4px)' }}
+                      >
+                        {other.name}
+                      </div>
+                    </React.Fragment>
+                  ))}
                 </div>
                 {(() => {
                   const midStation = selectedRoute.midStationName
