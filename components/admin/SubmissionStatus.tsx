@@ -82,7 +82,7 @@ export default function SubmissionStatus({ participants, steps, startDate, endDa
                   {user.name}
                 </span>
                 {submitted ? (
-                  <span className="text-indigo-600 font-medium tabular-nums">
+                  <span className="text-indigo-600 font-medium font-mono tabular-nums">
                     {steps.toLocaleString()} 歩
                   </span>
                 ) : (
