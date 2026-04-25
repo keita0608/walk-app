@@ -8,9 +8,11 @@ import { WalkEvent, AppUser, RankingEntry } from '@/lib/types';
 import { getEvent, getEventParticipants, getStepsByEvent, getUsers } from '@/lib/firebase/firestore';
 import { computeRankings } from '@/lib/utils/ranking';
 import { displayDate, getRankingCutoffDate } from '@/lib/utils/date';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function RankingPage({ params }: { params: { eventId: string } }) {
   const { eventId } = params;
+  const { user } = useAuth();
   const [event, setEvent]       = useState<WalkEvent | null>(null);
   const [entries, setEntries]   = useState<RankingEntry[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -72,7 +74,7 @@ export default function RankingPage({ params }: { params: { eventId: string } })
               )}
             </div>
 
-            <RankingTable entries={entries} />
+            <RankingTable entries={entries} currentUserId={user?.id} />
           </>
         )}
       </div>
