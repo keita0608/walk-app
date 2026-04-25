@@ -49,6 +49,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /config/{docId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
     match /steps/{stepId} {
       allow read: if isAuth();
       allow create: if isAdmin() || isDeveloper() || (isAuth() &&
