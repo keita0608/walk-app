@@ -57,6 +57,24 @@ export default function HomePage() {
           )}
         </div>
 
+        {/* Quick actions */}
+        <div className="grid grid-cols-2 gap-3">
+          <a
+            href="/steps"
+            className="flex flex-col items-center gap-1 p-4 bg-white rounded-xl border border-gray-100 shadow-sm hover:border-indigo-200 transition-colors"
+          >
+            <span className="text-2xl">👟</span>
+            <span className="text-sm font-medium text-gray-700">歩数を入力</span>
+          </a>
+          <a
+            href="/journey"
+            className="flex flex-col items-center gap-1 p-4 bg-white rounded-xl border border-gray-100 shadow-sm hover:border-indigo-200 transition-colors"
+          >
+            <span className="text-2xl">🚅</span>
+            <span className="text-sm font-medium text-gray-700">どこまでいける？</span>
+          </a>
+        </div>
+
         {loading ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent" />
