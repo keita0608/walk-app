@@ -137,7 +137,7 @@ export default function RankingTable({ entries, currentUserId }: Props) {
                   )}
                 </div>
                 <span className="text-xs text-gray-400 font-mono">
-                  合計 {formatSteps(entry.totalSteps)} 歩（{stepsToKm(entry.totalSteps).toFixed(1)} km） / {entry.submittedDays}日提出
+                  合計 {formatSteps(entry.totalSteps)} 歩{view === 'gross' && `（${stepsToKm(entry.totalSteps).toFixed(1)} km）`} / {entry.submittedDays}日提出
                 </span>
               </div>
               <div className="text-right shrink-0">
