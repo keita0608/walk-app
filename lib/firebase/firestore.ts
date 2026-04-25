@@ -50,10 +50,22 @@ export async function saveApiToken(userId: string, token: string): Promise<void>
   await updateDoc(doc(db, 'users', userId), { apiToken: token });
 }
 
-export async function setJourneyRoute(userId: string, routeId: string | null): Promise<void> {
-  await updateDoc(doc(db, 'users', userId), {
-    journeyRouteId: routeId ?? deleteField(),
-  });
+export async function setJourneyRoute(
+  userId: string,
+  routeId: string | null,
+  startDate?: string,
+): Promise<void> {
+  if (routeId === null) {
+    await updateDoc(doc(db, 'users', userId), {
+      journeyRouteId: deleteField(),
+      journeyRouteStartDate: deleteField(),
+    });
+  } else {
+    await updateDoc(doc(db, 'users', userId), {
+      journeyRouteId: routeId,
+      journeyRouteStartDate: startDate ?? deleteField(),
+    });
+  }
 }
 
 export async function deleteUserRecord(userId: string): Promise<void> {

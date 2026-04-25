@@ -11,6 +11,7 @@ export interface AppUser {
   gender?: Gender;
   apiToken?: string;
   journeyRouteId?: string;
+  journeyRouteStartDate?: string;
 }
 
 export interface WalkEvent {
