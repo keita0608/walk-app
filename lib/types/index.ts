@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'user';
+export type UserRole = 'admin' | 'user' | 'developer';
 export type EventType = 'individual' | 'team';
 export type EventStatus = 'upcoming' | 'active' | 'finished';
 export type Gender = 'male' | 'female';

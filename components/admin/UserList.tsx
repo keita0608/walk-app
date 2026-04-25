@@ -99,6 +99,7 @@ export default function UserList({ users, onUpdated }: Props) {
                   >
                     <option value="user">user</option>
                     <option value="admin">admin</option>
+                    <option value="developer">developer</option>
                   </select>
                 </div>
               </div>
@@ -141,7 +142,9 @@ export default function UserList({ users, onUpdated }: Props) {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium text-gray-800 truncate">{user.name}</span>
                   <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                    user.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'
+                    user.role === 'admin' ? 'bg-indigo-100 text-indigo-700'
+                    : user.role === 'developer' ? 'bg-amber-100 text-amber-700'
+                    : 'bg-gray-100 text-gray-500'
                   }`}>
                     {user.role}
                   </span>

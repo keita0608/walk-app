@@ -18,7 +18,8 @@ export default function StepForm({ eventId, alreadySubmitted, onSubmitted }: Pro
   const [error, setError] = useState('');
 
   const yesterday = getYesterdayJST();
-  const allowed = isSubmissionAllowed();
+  const isDeveloper = user?.role === 'developer';
+  const allowed = isDeveloper || isSubmissionAllowed();
   const disabled = alreadySubmitted || !allowed;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,7 +33,7 @@ export default function StepForm({ eventId, alreadySubmitted, onSubmitted }: Pro
       return;
     }
 
-    if (!isSubmissionAllowed()) {
+    if (!isDeveloper && !isSubmissionAllowed()) {
       setError('11:30 JST を過ぎているため提出できません');
       return;
     }
