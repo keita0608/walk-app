@@ -23,7 +23,7 @@ export default function StepsPage({ params }: { params: { eventId: string } }) {
     try {
       const [ev, existing] = await Promise.all([
         getEvent(eventId),
-        getStep(user.id, eventId, getYesterdayJST()),
+        getStep(user.id, getYesterdayJST()),
       ]);
       setEvent(ev);
       setAlreadySubmitted(!!existing);
@@ -62,7 +62,6 @@ export default function StepsPage({ params }: { params: { eventId: string } }) {
 
             {event.status === 'active' && (
               <StepForm
-                eventId={eventId}
                 alreadySubmitted={alreadySubmitted}
                 onSubmitted={() => setAlreadySubmitted(true)}
               />

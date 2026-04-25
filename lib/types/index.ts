@@ -39,7 +39,6 @@ export interface Team {
 export interface StepEntry {
   id: string;
   userId: string;
-  eventId: string;
   date: string; // YYYY-MM-DD
   steps: number;
   submittedAt: Date;

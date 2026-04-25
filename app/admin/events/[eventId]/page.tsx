@@ -11,7 +11,7 @@ import { WalkEvent, AppUser, EventParticipant, RankingEntry, Team, StepEntry } f
 import {
   getEvent,
   getEventParticipants,
-  getStepsByEvent,
+  getStepsByDateRange,
   getUsers,
   getTeams,
   updateEvent,
@@ -58,15 +58,15 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
   const load = async () => {
     setLoading(true);
     try {
-      const [ev, rawParticipants, steps, users, eventTeams] = await Promise.all([
+      const [ev, rawParticipants, users, eventTeams] = await Promise.all([
         getEvent(eventId),
         getEventParticipants(eventId),
-        getStepsByEvent(eventId),
         getUsers(),
         getTeams(eventId),
       ]);
-
       if (!ev) return;
+      const steps = await getStepsByDateRange(ev.startDate, ev.endDate);
+
       setEvent(ev);
       setAllParticipants(rawParticipants);
       setAllUsers(users);
@@ -359,7 +359,6 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
             {/* ── Data correction tab ── */}
             {tab === 'correction' && (
               <DataCorrection
-                eventId={eventId}
                 participants={participants}
                 startDate={event.startDate}
                 endDate={event.endDate}
@@ -410,7 +409,7 @@ export default function AdminEventPage({ params }: { params: { eventId: string }
                 <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full space-y-4">
                   <h3 className="font-semibold text-gray-800">イベントを削除しますか？</h3>
                   <p className="text-sm text-gray-600">
-                    「<strong>{event.title}</strong>」を削除します。参加者・歩数データも含めてすべて削除されます。この操作は取り消せません。
+                    「<strong>{event.title}</strong>」を削除します。参加者データも削除されます（歩数データはユーザーに紐づくため保持されます）。この操作は取り消せません。
                   </p>
                   <div className="flex gap-3">
                     <button

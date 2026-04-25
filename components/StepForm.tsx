@@ -6,12 +6,11 @@ import { submitStep } from '@/lib/firebase/firestore';
 import { getYesterdayJST, isSubmissionAllowed, displayDate } from '@/lib/utils/date';
 
 interface Props {
-  eventId: string;
   alreadySubmitted: boolean;
   onSubmitted: () => void;
 }
 
-export default function StepForm({ eventId, alreadySubmitted, onSubmitted }: Props) {
+export default function StepForm({ alreadySubmitted, onSubmitted }: Props) {
   const { user } = useAuth();
   const [steps, setSteps] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -40,7 +39,7 @@ export default function StepForm({ eventId, alreadySubmitted, onSubmitted }: Pro
 
     setSubmitting(true);
     try {
-      await submitStep(user.id, eventId, yesterday, val);
+      await submitStep(user.id, yesterday, val);
       onSubmitted();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
