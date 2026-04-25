@@ -5,7 +5,7 @@ import Link from 'next/link';
 import AuthGuard from '@/components/AuthGuard';
 import RankingTable from '@/components/RankingTable';
 import { WalkEvent, AppUser, RankingEntry } from '@/lib/types';
-import { getEvent, getEventParticipants, getStepsByEvent, getUsers } from '@/lib/firebase/firestore';
+import { getEvent, getEventParticipants, getStepsByDateRange, getUsers } from '@/lib/firebase/firestore';
 import { computeRankings } from '@/lib/utils/ranking';
 import { displayDate, getRankingCutoffDate } from '@/lib/utils/date';
 
@@ -18,13 +18,13 @@ export default function RankingPage({ params }: { params: { eventId: string } })
   const load = async () => {
     setLoading(true);
     try {
-      const [ev, participants, steps, allUsers] = await Promise.all([
+      const [ev, participants, allUsers] = await Promise.all([
         getEvent(eventId),
         getEventParticipants(eventId),
-        getStepsByEvent(eventId),
         getUsers(),
       ]);
       if (!ev) return;
+      const steps = await getStepsByDateRange(ev.startDate, ev.endDate);
       setEvent(ev);
 
       const userMap = Object.fromEntries(allUsers.map((u) => [u.id, u]));

@@ -53,11 +53,15 @@ service cloud.firestore {
       allow read: if isAuth();
       allow create: if isAdmin() || isDeveloper() || (isAuth() &&
         request.auth.uid == request.resource.data.userId &&
+        stepId == request.auth.uid + '_' + request.resource.data.date &&
         isBeforeDeadlineJST() &&
         request.resource.data.steps is int &&
         request.resource.data.steps > 0 &&
         request.resource.data.steps < 100000);
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin() || isDeveloper() || (isAuth() &&
+        request.auth.uid == resource.data.userId &&
+        isBeforeDeadlineJST());
+      allow delete: if isAdmin();
     }
   }
 }

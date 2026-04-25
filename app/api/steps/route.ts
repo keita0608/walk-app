@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebase/admin';
-import { FieldPath, Timestamp } from 'firebase-admin/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
 import { getYesterdayJST } from '@/lib/utils/date';
 
 export async function POST(request: NextRequest) {
@@ -24,44 +24,11 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = usersSnap.docs[0].id;
-
-    // Find participations for this user
-    const participationsSnap = await getAdminDb()
-      .collection('eventParticipants')
-      .where('userId', '==', userId)
-      .get();
-
-    if (participationsSnap.empty) {
-      return NextResponse.json({ error: 'no event participation found' }, { status: 404 });
-    }
-
-    const eventIds = Array.from(new Set(participationsSnap.docs.map((d) => d.data().eventId as string)));
-
-    // Find an active event among the participant's events (Firestore 'in' limit = 30)
-    let activeEventId: string | null = null;
-    for (let i = 0; i < eventIds.length; i += 30) {
-      const batch = eventIds.slice(i, i + 30);
-      const eventsSnap = await getAdminDb()
-        .collection('events')
-        .where(FieldPath.documentId(), 'in', batch)
-        .where('status', '==', 'active')
-        .limit(1)
-        .get();
-      if (!eventsSnap.empty) {
-        activeEventId = eventsSnap.docs[0].id;
-        break;
-      }
-    }
-
-    if (!activeEventId) {
-      return NextResponse.json({ error: 'no active event' }, { status: 404 });
-    }
-
     const stepDate = date ?? getYesterdayJST();
-    const stepId = `${userId}_${activeEventId}_${stepDate}`;
+    const stepId = `${userId}_${stepDate}`;
 
     await getAdminDb().collection('steps').doc(stepId).set(
-      { userId, eventId: activeEventId, date: stepDate, steps, updatedAt: Timestamp.now() },
+      { userId, date: stepDate, steps, updatedAt: Timestamp.now() },
       { merge: true },
     );
 

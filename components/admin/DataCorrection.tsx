@@ -6,7 +6,6 @@ import { adminUpdateStep, getStep } from '@/lib/firebase/firestore';
 import { getDateRange } from '@/lib/utils/date';
 
 interface Props {
-  eventId: string;
   participants: AppUser[];
   startDate: string;
   endDate: string;
@@ -24,7 +23,6 @@ function shortDate(d: string) {
 }
 
 export default function DataCorrection({
-  eventId,
   participants,
   startDate,
   endDate,
@@ -46,7 +44,7 @@ export default function DataCorrection({
     setSaveError('');
     setSaveSuccess(false);
     try {
-      const entries = await Promise.all(dates.map((d) => getStep(userId, eventId, d)));
+      const entries = await Promise.all(dates.map((d) => getStep(userId, d)));
       const next: Record<string, DayState> = {};
       dates.forEach((d, i) => {
         next[d] = {
@@ -84,7 +82,7 @@ export default function DataCorrection({
     try {
       await Promise.all(
         toSave.map((d) =>
-          adminUpdateStep(selectedUserId, eventId, d, parseInt(days[d].value, 10)),
+          adminUpdateStep(selectedUserId, d, parseInt(days[d].value, 10)),
         ),
       );
       setDirty(new Set());

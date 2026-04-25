@@ -72,7 +72,7 @@ export async function updateEvent(
   await updateDoc(doc(db, 'events', eventId), data);
 }
 
-// Deletes an event and all its participants, teams, and steps.
+// Deletes an event and all its participants and teams (steps are user-level and not deleted).
 export async function deleteEvent(eventId: string): Promise<void> {
   const deleteDocs = async (col: string, field: string) => {
     const q = query(collection(db, col), where(field, '==', eventId));
@@ -83,7 +83,6 @@ export async function deleteEvent(eventId: string): Promise<void> {
     deleteDoc(doc(db, 'events', eventId)),
     deleteDocs('eventParticipants', 'eventId'),
     deleteDocs('teams', 'eventId'),
-    deleteDocs('steps', 'eventId'),
   ]);
 }
 
@@ -162,7 +161,6 @@ function toStepEntry(id: string, data: Record<string, unknown>): StepEntry {
   return {
     id,
     userId:      data.userId as string,
-    eventId:     data.eventId as string,
     date:        data.date as string,
     steps:       data.steps as number,
     submittedAt: (data.submittedAt as Timestamp)?.toDate?.() ?? new Date(),
@@ -170,50 +168,39 @@ function toStepEntry(id: string, data: Record<string, unknown>): StepEntry {
   };
 }
 
-export async function getStepsByEvent(eventId: string): Promise<StepEntry[]> {
-  const q = query(collection(db, 'steps'), where('eventId', '==', eventId));
+export async function getStepsByDateRange(startDate: string, endDate: string): Promise<StepEntry[]> {
+  const q = query(
+    collection(db, 'steps'),
+    where('date', '>=', startDate),
+    where('date', '<=', endDate),
+  );
   const snap = await getDocs(q);
   return snap.docs.map((d) => toStepEntry(d.id, d.data()));
 }
 
-export async function getStep(
-  userId: string,
-  eventId: string,
-  date: string,
-): Promise<StepEntry | null> {
-  const stepId = `${userId}_${eventId}_${date}`;
+export async function getStep(userId: string, date: string): Promise<StepEntry | null> {
+  const stepId = `${userId}_${date}`;
   const snap = await getDoc(doc(db, 'steps', stepId));
   if (!snap.exists()) return null;
   return toStepEntry(snap.id, snap.data());
 }
 
-// Uses composite ID to enforce one-submission-per-user-per-day at DB level.
-export async function submitStep(
-  userId: string,
-  eventId: string,
-  date: string,
-  steps: number,
-): Promise<void> {
-  const stepId = `${userId}_${eventId}_${date}`;
-  await setDoc(doc(db, 'steps', stepId), {
-    userId,
-    eventId,
-    date,
-    steps,
-    submittedAt: Timestamp.now(),
-  });
+export async function submitStep(userId: string, date: string, steps: number): Promise<void> {
+  const stepId = `${userId}_${date}`;
+  const ref = doc(db, 'steps', stepId);
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    await updateDoc(ref, { steps, updatedAt: Timestamp.now() });
+  } else {
+    await setDoc(ref, { userId, date, steps, submittedAt: Timestamp.now() });
+  }
 }
 
-export async function adminUpdateStep(
-  userId: string,
-  eventId: string,
-  date: string,
-  steps: number,
-): Promise<void> {
-  const stepId = `${userId}_${eventId}_${date}`;
+export async function adminUpdateStep(userId: string, date: string, steps: number): Promise<void> {
+  const stepId = `${userId}_${date}`;
   await setDoc(
     doc(db, 'steps', stepId),
-    { userId, eventId, date, steps, updatedAt: Timestamp.now() },
+    { userId, date, steps, updatedAt: Timestamp.now() },
     { merge: true },
   );
 }
