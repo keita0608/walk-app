@@ -10,6 +10,7 @@ export interface AppUser {
   role: UserRole;
   gender?: Gender;
   apiToken?: string;
+  journeyRouteId?: string;
 }
 
 export interface WalkEvent {
