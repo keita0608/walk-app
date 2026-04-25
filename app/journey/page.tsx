@@ -202,7 +202,10 @@ export default function JourneyPage() {
                   )}
                 </div>
                 {(() => {
-                  const mid = selectedRoute.stations[Math.floor(selectedRoute.stations.length / 2)];
+                  const midKm = position.routeKm / 2;
+                  const mid = selectedRoute.stations.reduce((best, s) =>
+                    Math.abs(s.km - midKm) < Math.abs(best.km - midKm) ? s : best
+                  );
                   return (
                     <div className="relative h-6 mt-1">
                       <span className="absolute left-0 text-xs text-gray-500">
