@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
@@ -11,8 +11,14 @@ import { getTodayJST } from '@/lib/utils/date';
 
 function fmt(km: number) { return km.toFixed(1); }
 
-function FlippedTrain() {
-  return <span style={{ display: 'inline-block', transform: 'scaleX(-1)' }}>🚅</span>;
+function RouteIcon({ route, style }: { route: Route; style?: React.CSSProperties }) {
+  const icon = route.icon ?? '🚅';
+  const flip = route.flipIcon !== false;
+  return (
+    <span style={{ display: 'inline-block', transform: flip ? 'scaleX(-1)' : undefined, ...style }}>
+      {icon}
+    </span>
+  );
 }
 
 export default function JourneyPage() {
@@ -209,12 +215,9 @@ export default function JourneyPage() {
                   {!position.completed && (
                     <div
                       className="absolute top-1/2 -translate-y-1/2 text-lg leading-none"
-                      style={{
-                        left: `${position.pct}%`,
-                        transform: 'translateY(-50%) translateX(-50%) scaleX(-1)',
-                      }}
+                      style={{ left: `${position.pct}%`, transform: 'translateY(-50%) translateX(-50%)' }}
                     >
-                      🚅
+                      <RouteIcon route={selectedRoute} />
                     </div>
                   )}
                 </div>
@@ -258,7 +261,7 @@ export default function JourneyPage() {
                   >
                     <span className="text-base w-5 text-center shrink-0">
                       {position.completed && isLast ? '🎉'
-                        : current ? <FlippedTrain />
+                        : current ? <RouteIcon route={selectedRoute} />
                         : next    ? '⬜'
                         : passed  ? '✅'
                         : '◯'}

@@ -7,6 +7,8 @@ export interface Route {
   id: string;
   name: string;
   stations: Station[];
+  icon?: string;     // default '🚅'
+  flipIcon?: boolean; // default true (trains face left)
 }
 
 export const TOKAIDO: Route = {
@@ -142,4 +144,15 @@ export const YAMANOTE: Route = {
   ],
 };
 
-export const ROUTES: Route[] = [TOKAIDO, TOHOKU, JOETSU, KYUSHU, YAMANOTE];
+export const SEOUL: Route = {
+  id: 'seoul',
+  name: 'ソウル 🇰🇷',
+  stations: [
+    { name: '東京', km: 0 },
+    { name: 'ソウル', km: 1150 },
+  ],
+  icon: '✈️',
+  flipIcon: false,
+};
+
+export const ROUTES: Route[] = [TOKAIDO, TOHOKU, JOETSU, KYUSHU, YAMANOTE, SEOUL];
