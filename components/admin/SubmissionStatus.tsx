@@ -20,6 +20,7 @@ export default function SubmissionStatus({ participants, steps, startDate, endDa
   }, [startDate, endDate]);
 
   const [selectedDate, setSelectedDate] = useState<string>(dates[0] ?? '');
+  const [masked, setMasked] = useState(false);
 
   const stepMap = useMemo(() => {
     const map: Record<string, number> = {};
@@ -30,7 +31,6 @@ export default function SubmissionStatus({ participants, steps, startDate, endDa
   }, [steps, selectedDate]);
 
   const submitted = participants.filter((u) => stepMap[u.id] !== undefined);
-  const notSubmitted = participants.filter((u) => stepMap[u.id] === undefined);
 
   if (dates.length === 0) {
     return <p className="text-sm text-gray-400 text-center py-8">表示できるデータがありません</p>;
@@ -38,7 +38,7 @@ export default function SubmissionStatus({ participants, steps, startDate, endDa
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <label className="text-sm text-gray-600 shrink-0">日付を選択</label>
         <select
           value={selectedDate}
@@ -53,19 +53,22 @@ export default function SubmissionStatus({ participants, steps, startDate, endDa
         <span className="text-xs text-gray-400">
           提出 {submitted.length} / {participants.length} 名
         </span>
+        <button
+          onClick={() => setMasked((v) => !v)}
+          className={`ml-auto text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+            masked
+              ? 'bg-gray-800 text-white border-gray-800'
+              : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'
+          }`}
+        >
+          {masked ? '👁 数字を表示' : '🙈 数字を隠す'}
+        </button>
       </div>
 
       <div className="space-y-2">
         {participants
           .slice()
-          .sort((a, b) => {
-            const aSteps = stepMap[a.id];
-            const bSteps = stepMap[b.id];
-            if (aSteps !== undefined && bSteps !== undefined) return bSteps - aSteps;
-            if (aSteps !== undefined) return -1;
-            if (bSteps !== undefined) return 1;
-            return a.name.localeCompare(b.name, 'ja');
-          })
+          .sort((a, b) => a.name.localeCompare(b.name, 'ja'))
           .map((user) => {
             const steps = stepMap[user.id];
             const submitted = steps !== undefined;
@@ -83,7 +86,7 @@ export default function SubmissionStatus({ participants, steps, startDate, endDa
                 </span>
                 {submitted ? (
                   <span className="text-indigo-600 font-medium font-mono tabular-nums">
-                    {steps.toLocaleString()} 歩
+                    {masked ? '*' : `${steps.toLocaleString()} 歩`}
                   </span>
                 ) : (
                   <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
