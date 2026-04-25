@@ -68,14 +68,7 @@ export default function SubmissionStatus({ participants, steps, startDate, endDa
       <div className="space-y-2">
         {participants
           .slice()
-          .sort((a, b) => {
-            const aSteps = stepMap[a.id];
-            const bSteps = stepMap[b.id];
-            if (aSteps !== undefined && bSteps !== undefined) return bSteps - aSteps;
-            if (aSteps !== undefined) return -1;
-            if (bSteps !== undefined) return 1;
-            return a.name.localeCompare(b.name, 'ja');
-          })
+          .sort((a, b) => a.name.localeCompare(b.name, 'ja'))
           .map((user) => {
             const steps = stepMap[user.id];
             const submitted = steps !== undefined;
