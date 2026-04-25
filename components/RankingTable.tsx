@@ -125,12 +125,12 @@ export default function RankingTable({ entries }: Props) {
                     <span title="未提出の日があります" className="text-yellow-500 text-sm">⚠️</span>
                   )}
                 </div>
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-gray-400 font-mono">
                   合計 {formatSteps(entry.totalSteps)} 歩 / {entry.submittedDays}日提出
                 </span>
               </div>
               <div className="text-right shrink-0">
-                <span className="text-lg font-bold text-indigo-600">{formatSteps(displaySteps)}</span>
+                <span className="text-lg font-bold font-mono text-indigo-600">{formatSteps(displaySteps)}</span>
                 <span className="text-xs text-gray-400 ml-1">歩/日</span>
               </div>
             </div>
@@ -148,7 +148,7 @@ export default function RankingTable({ entries }: Props) {
               )}
             </div>
             {effectiveTarget !== undefined && (
-              <p className="text-xs text-red-400 mt-1 text-right">目標 {formatSteps(effectiveTarget)} 歩</p>
+              <p className="text-xs text-red-400 mt-1 text-right font-mono">目標 {formatSteps(effectiveTarget)} 歩</p>
             )}
           </div>
         );
@@ -175,7 +175,7 @@ export default function RankingTable({ entries }: Props) {
                 <span className="text-gray-300 mx-1.5">·</span>
                 <span>{shortDate(tooltip.date)}（{DOW_LABELS[tooltip.dow]}曜）</span>
                 <span className="text-gray-300 mx-1.5">·</span>
-                <span className="font-bold">{formatSteps(tooltip.steps)} 歩</span>
+                <span className="font-bold font-mono">{formatSteps(tooltip.steps)} 歩</span>
               </span>
               <button onClick={() => setTooltip(null)} className="ml-3 text-gray-400 hover:text-white text-base leading-none">✕</button>
             </div>
@@ -187,7 +187,7 @@ export default function RankingTable({ entries }: Props) {
               <div key={entry.userId}>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-sm font-medium text-gray-700 w-24 truncate shrink-0">{entry.name}</span>
-                  <span className="text-xs text-gray-400">{formatSteps(entry.totalSteps)} 歩</span>
+                  <span className="text-xs text-gray-400 font-mono">{formatSteps(entry.totalSteps)} 歩</span>
                 </div>
                 {/* Outer track (gray bg, full width, rounded) */}
                 <div className="relative h-6 w-full rounded-full overflow-hidden">
