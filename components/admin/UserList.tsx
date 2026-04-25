@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { AppUser, UserRole, Gender } from '@/lib/types';
-import { updateUser, saveApiToken } from '@/lib/firebase/firestore';
+import { updateUser, saveApiToken, setJourneyRoute } from '@/lib/firebase/firestore';
+import { ROUTES } from '@/lib/data/routes';
 import UserDataCorrection from './UserDataCorrection';
 
 interface Props {
@@ -11,8 +12,10 @@ interface Props {
 }
 
 export default function UserList({ users, onUpdated }: Props) {
-  const [editingId, setEditingId]         = useState<string | null>(null);
-  const [correctionId, setCorrectionId] = useState<string | null>(null);
+  const [editingId, setEditingId]           = useState<string | null>(null);
+  const [correctionId, setCorrectionId]   = useState<string | null>(null);
+  const [resetConfirmId, setResetConfirmId] = useState<string | null>(null);
+  const [resetting, setResetting]           = useState(false);
   const [editName, setEditName]         = useState('');
   const [editRole, setEditRole]         = useState<UserRole>('user');
   const [generatingId, setGeneratingId] = useState<string | null>(null);
@@ -52,6 +55,20 @@ export default function UserList({ users, onUpdated }: Props) {
       setSaving(false);
     }
   };
+
+  const handleJourneyReset = async (userId: string) => {
+    setResetting(true);
+    try {
+      await setJourneyRoute(userId, null);
+      setResetConfirmId(null);
+      onUpdated();
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const routeName = (routeId?: string) =>
+    ROUTES.find((r) => r.id === routeId)?.name ?? null;
 
   const genderLabel = (g?: Gender) =>
     g === 'male' ? '男性' : g === 'female' ? '女性' : '—';
@@ -154,8 +171,21 @@ export default function UserList({ users, onUpdated }: Props) {
                   <span className="text-xs text-gray-400">{genderLabel(user.gender)}</span>
                 </div>
                 <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                {routeName(user.journeyRouteId) && (
+                  <p className="text-xs text-indigo-500">
+                    🚅 {routeName(user.journeyRouteId)}
+                  </p>
+                )}
               </div>
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                {user.journeyRouteId && (
+                  <button
+                    onClick={() => setResetConfirmId(user.id)}
+                    className="text-xs text-red-400 hover:text-red-600"
+                  >
+                    旅リセット
+                  </button>
+                )}
                 <button
                   onClick={() => setCorrectionId(correctionId === user.id ? null : user.id)}
                   className="text-sm text-amber-600 hover:text-amber-800"
@@ -213,6 +243,33 @@ export default function UserList({ users, onUpdated }: Props) {
           )}
         </div>
       ))}
+      {/* Journey reset confirmation */}
+      {resetConfirmId && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full space-y-4">
+            <h3 className="font-semibold text-gray-800">旅をリセットしますか？</h3>
+            <p className="text-sm text-gray-600">
+              <strong>{users.find((u) => u.id === resetConfirmId)?.name}</strong> のルート選択をクリアします。歩数データは削除されません。
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setResetConfirmId(null)}
+                disabled={resetting}
+                className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={() => handleJourneyReset(resetConfirmId)}
+                disabled={resetting}
+                className="flex-1 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:bg-gray-300 font-medium"
+              >
+                {resetting ? 'リセット中…' : 'リセットする'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

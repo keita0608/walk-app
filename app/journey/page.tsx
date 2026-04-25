@@ -7,6 +7,7 @@ import AuthGuard from '@/components/AuthGuard';
 import { getStepsByUser, setJourneyRoute } from '@/lib/firebase/firestore';
 import { computePosition, stepsToKm, JourneyPosition } from '@/lib/utils/journey';
 import { ROUTES, Route } from '@/lib/data/routes';
+import { getTodayJST } from '@/lib/utils/date';
 
 function fmt(km: number) { return km.toFixed(1); }
 
@@ -19,17 +20,22 @@ export default function JourneyPage() {
   const [selectedRoute, setSelectedRoute] = useState<Route | null | undefined>(undefined);
   const [position, setPosition]           = useState<JourneyPosition | null>(null);
   const [totalSteps, setTotalSteps]       = useState(0);
+  const [routeSteps, setRouteSteps]       = useState(0);
   const [loading, setLoading]             = useState(true);
   const [selecting, setSelecting]         = useState(false);
 
-  const loadJourney = async (route: Route) => {
+  const loadJourney = async (route: Route, startDate: string) => {
     if (!user) return;
     setLoading(true);
     try {
       const steps = await getStepsByUser(user.id);
-      const sum = steps.reduce((acc, s) => acc + s.steps, 0);
-      setTotalSteps(sum);
-      setPosition(computePosition(stepsToKm(sum), route));
+      const total = steps.reduce((sum, s) => sum + s.steps, 0);
+      const forRoute = steps
+        .filter((s) => s.date >= startDate)
+        .reduce((sum, s) => sum + s.steps, 0);
+      setTotalSteps(total);
+      setRouteSteps(forRoute);
+      setPosition(computePosition(stepsToKm(forRoute), route));
     } finally {
       setLoading(false);
     }
@@ -40,22 +46,32 @@ export default function JourneyPage() {
     const route = ROUTES.find((r) => r.id === user.journeyRouteId) ?? null;
     setSelectedRoute(route);
     if (route) {
-      loadJourney(route);
+      loadJourney(route, user.journeyRouteStartDate ?? '2000-01-01');
     } else {
       setLoading(false);
     }
   }, [user]);
 
-  const handleSelectRoute = async (route: Route) => {
+  // First-time selection: include all historical steps ('2000-01-01')
+  // Re-selection after completion: start fresh from today
+  const handleSelectRoute = async (route: Route, afterCompletion = false) => {
     if (!user) return;
     setSelecting(true);
     try {
-      await setJourneyRoute(user.id, route.id);
+      const startDate = afterCompletion ? getTodayJST() : '2000-01-01';
+      await setJourneyRoute(user.id, route.id, startDate);
       setSelectedRoute(route);
-      await loadJourney(route);
+      await loadJourney(route, startDate);
     } finally {
       setSelecting(false);
     }
+  };
+
+  const handleNextRoute = async () => {
+    setSelectedRoute(null);
+    setPosition(null);
+    setRouteSteps(0);
+    setLoading(false);
   };
 
   const isReady = selectedRoute !== undefined && !loading;
@@ -78,7 +94,7 @@ export default function JourneyPage() {
           /* ── Route selection ── */
           <div className="space-y-4">
             <p className="text-sm text-gray-500">
-              ルートを選択してください。選択後はクリアするまで変更できません。
+              ルートを選択してください。選択後はゴールするまで変更できません。
             </p>
             <div className="space-y-3">
               {ROUTES.map((route) => {
@@ -87,7 +103,7 @@ export default function JourneyPage() {
                 return (
                   <button
                     key={route.id}
-                    onClick={() => handleSelectRoute(route)}
+                    onClick={() => handleSelectRoute(route, position?.completed)}
                     disabled={selecting}
                     className="w-full text-left bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:border-indigo-300 transition-colors disabled:opacity-50"
                   >
@@ -113,14 +129,18 @@ export default function JourneyPage() {
           /* ── Journey view ── */
           <>
             {/* Stats */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center">
-                <p className="text-2xl font-bold text-indigo-600 font-mono">{fmt(position.totalKm)}</p>
-                <p className="text-xs text-gray-400 mt-1">累計 km</p>
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">累計</span>
+                <span className="text-sm font-mono font-medium text-gray-700">
+                  {totalSteps.toLocaleString()} 歩（{fmt(stepsToKm(totalSteps))} km）
+                </span>
               </div>
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center">
-                <p className="text-2xl font-bold text-gray-700 font-mono">{totalSteps.toLocaleString()}</p>
-                <p className="text-xs text-gray-400 mt-1">累計 歩</p>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">今回のルートで</span>
+                <span className="text-sm font-mono font-bold text-indigo-600">
+                  {routeSteps.toLocaleString()} 歩（{fmt(stepsToKm(routeSteps))} km）
+                </span>
               </div>
             </div>
 
@@ -152,15 +172,13 @@ export default function JourneyPage() {
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
               <div className="relative">
                 <div className="relative h-2 bg-gray-200 rounded-full mx-3 my-6">
-                  {/* Progress fill */}
                   <div
                     className="absolute left-0 top-0 h-2 bg-indigo-500 rounded-full transition-all duration-700"
                     style={{ width: `${Math.min(position.pct, 100)}%` }}
                   />
-                  {/* Station dots */}
                   {selectedRoute.stations.map((s) => {
                     const pct    = (s.km / position.routeKm) * 100;
-                    const passed = s.km <= position.totalKm;
+                    const passed = s.km <= stepsToKm(routeSteps);
                     return (
                       <div
                         key={s.name}
@@ -171,7 +189,6 @@ export default function JourneyPage() {
                       />
                     );
                   })}
-                  {/* Train marker (flipped ←) */}
                   {!position.completed && (
                     <div
                       className="absolute top-1/2 -translate-y-1/2 text-lg leading-none"
@@ -184,10 +201,11 @@ export default function JourneyPage() {
                     </div>
                   )}
                 </div>
-
-                {/* Labels */}
                 {(() => {
-                  const mid = selectedRoute.stations[Math.floor(selectedRoute.stations.length / 2)];
+                  const midKm = position.routeKm / 2;
+                  const mid = selectedRoute.stations.reduce((best, s) =>
+                    Math.abs(s.km - midKm) < Math.abs(best.km - midKm) ? s : best
+                  );
                   return (
                     <div className="relative h-6 mt-1">
                       <span className="absolute left-0 text-xs text-gray-500">
@@ -211,7 +229,8 @@ export default function JourneyPage() {
             {/* Station list */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm divide-y divide-gray-50">
               {selectedRoute.stations.map((s, i) => {
-                const passed  = s.km < position.totalKm;
+                const routeKm = stepsToKm(routeSteps);
+                const passed  = s.km < routeKm;
                 const current = !position.completed && position.prevStation.name === s.name;
                 const next    = position.nextStation?.name === s.name;
                 const isLast  = i === selectedRoute.stations.length - 1;
@@ -240,15 +259,24 @@ export default function JourneyPage() {
               })}
             </div>
 
-            <Link
-              href="/steps"
-              className="block text-center text-sm px-4 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700"
-            >
-              歩数を入力する
-            </Link>
+            {position.completed ? (
+              <button
+                onClick={handleNextRoute}
+                disabled={selecting}
+                className="w-full text-center text-sm px-4 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium"
+              >
+                🚅 次のルートを選択する
+              </button>
+            ) : (
+              <Link
+                href="/steps"
+                className="block text-center text-sm px-4 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700"
+              >
+                歩数を入力する
+              </Link>
+            )}
           </>
         ) : null}
-
       </div>
     </AuthGuard>
   );
