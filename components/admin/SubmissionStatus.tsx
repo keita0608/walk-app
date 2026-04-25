@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { AppUser } from '@/lib/types';
-import { StepEntry } from '@/lib/types';
+import { AppUser, StepEntry } from '@/lib/types';
 import { getDateRange, getYesterdayJST } from '@/lib/utils/date';
 
 interface Props {
@@ -10,6 +9,14 @@ interface Props {
   steps: StepEntry[];
   startDate: string;
   endDate: string;
+}
+
+function formatTime(d?: Date): string {
+  if (!d) return '';
+  const jst = new Date(d.getTime() + 9 * 3600000);
+  const h = String(jst.getUTCHours()).padStart(2, '0');
+  const m = String(jst.getUTCMinutes()).padStart(2, '0');
+  return `${h}:${m}`;
 }
 
 export default function SubmissionStatus({ participants, steps, startDate, endDate }: Props) {
@@ -23,9 +30,9 @@ export default function SubmissionStatus({ participants, steps, startDate, endDa
   const [masked, setMasked] = useState(false);
 
   const stepMap = useMemo(() => {
-    const map: Record<string, number> = {};
+    const map: Record<string, StepEntry> = {};
     for (const s of steps) {
-      if (s.date === selectedDate) map[s.userId] = s.steps;
+      if (s.date === selectedDate) map[s.userId] = s;
     }
     return map;
   }, [steps, selectedDate]);
@@ -70,24 +77,28 @@ export default function SubmissionStatus({ participants, steps, startDate, endDa
           .slice()
           .sort((a, b) => a.name.localeCompare(b.name, 'ja'))
           .map((user) => {
-            const steps = stepMap[user.id];
-            const submitted = steps !== undefined;
+            const entry = stepMap[user.id];
+            const isSubmitted = entry !== undefined;
+            const time = formatTime(entry?.updatedAt);
             return (
               <div
                 key={user.id}
                 className={`flex items-center justify-between px-4 py-3 rounded-xl border text-sm ${
-                  submitted
-                    ? 'bg-white border-gray-100'
-                    : 'bg-gray-50 border-gray-100'
+                  isSubmitted ? 'bg-white border-gray-100' : 'bg-gray-50 border-gray-100'
                 }`}
               >
-                <span className={`font-medium ${submitted ? 'text-gray-800' : 'text-gray-400'}`}>
+                <span className={`font-medium ${isSubmitted ? 'text-gray-800' : 'text-gray-400'}`}>
                   {user.name}
                 </span>
-                {submitted ? (
-                  <span className="text-indigo-600 font-medium font-mono tabular-nums">
-                    {masked ? '*' : `${steps.toLocaleString()} 歩`}
-                  </span>
+                {isSubmitted ? (
+                  <div className="flex items-center gap-3">
+                    {!masked && time && (
+                      <span className="text-xs text-gray-400 font-mono">{time}</span>
+                    )}
+                    <span className="text-indigo-600 font-medium font-mono tabular-nums">
+                      {masked ? '*' : `${entry.steps.toLocaleString()} 歩`}
+                    </span>
+                  </div>
                 ) : (
                   <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
                     未提出

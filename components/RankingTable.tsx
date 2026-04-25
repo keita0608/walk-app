@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { RankingEntry } from '@/lib/types';
 import { formatSteps } from '@/lib/utils/ranking';
+import ShinkansenMap from '@/components/ShinkansenMap';
 
 // Earthy warm-to-cool gradient: rust → sand → sage → teal
 export const DOW_COLORS = [
@@ -24,9 +25,14 @@ function shortDate(d: string) {
 
 interface Props {
   entries: RankingEntry[];
+  currentUserId?: string;
 }
 
-type View = 'gross' | 'net' | 'chart';
+type View = 'gross' | 'net' | 'chart' | 'map';
+
+function stepsToKm(steps: number) {
+  return steps * 0.7 / 1000;
+}
 
 interface TooltipInfo {
   name: string;
@@ -35,10 +41,14 @@ interface TooltipInfo {
   dow: number;
 }
 
-export default function RankingTable({ entries }: Props) {
+export default function RankingTable({ entries, currentUserId }: Props) {
   const hasHandicap = entries.some((e) => e.handicapMultiplier > 1);
   const [view, setView] = useState<View>('gross');
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
+  const defaultMapUser = currentUserId && entries.find(e => e.userId === currentUserId)
+    ? currentUserId
+    : entries[0]?.userId ?? '';
+  const [mapUserId, setMapUserId] = useState<string>(defaultMapUser);
 
   const displayEntries = [...entries].sort((a, b) => {
     const diff = view === 'net'
@@ -80,10 +90,11 @@ export default function RankingTable({ entries }: Props) {
           <button onClick={() => setView('net')} className={btnClass('net')}>ネット（ハンデ適用）</button>
         )}
         <button onClick={() => { setView('chart'); setTooltip(null); }} className={btnClass('chart')}>累計グラフ</button>
+        <button onClick={() => { setView('map'); setTooltip(null); }} className={btnClass('map')}>どこまでいける？</button>
       </div>
 
       {/* ── Gross / Net ranking ── */}
-      {view !== 'chart' && displayEntries.map((entry, idx) => {
+      {view !== 'chart' && view !== 'map' && displayEntries.map((entry, idx) => {
         const displaySteps = view === 'net' ? entry.netAverageSteps : entry.averageSteps;
         // When showing net, scale target by the same handicap multiplier
         const effectiveTarget = entry.targetSteps !== undefined
@@ -126,7 +137,7 @@ export default function RankingTable({ entries }: Props) {
                   )}
                 </div>
                 <span className="text-xs text-gray-400 font-mono">
-                  合計 {formatSteps(entry.totalSteps)} 歩 / {entry.submittedDays}日提出
+                  合計 {formatSteps(entry.totalSteps)} 歩{view === 'gross' && `（${stepsToKm(entry.totalSteps).toFixed(1)} km）`} / {entry.submittedDays}日提出
                 </span>
               </div>
               <div className="text-right shrink-0">
@@ -217,6 +228,32 @@ export default function RankingTable({ entries }: Props) {
           </div>
         </div>
       )}
+
+      {/* ── Map view ── */}
+      {view === 'map' && (() => {
+        const mapEntry = entries.find(e => e.userId === mapUserId) ?? entries[0];
+        if (!mapEntry) return null;
+        const distKm = stepsToKm(mapEntry.totalSteps);
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600 shrink-0">ユーザー</label>
+              <select
+                value={mapUserId}
+                onChange={e => setMapUserId(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {[...entries]
+                  .sort((a, b) => a.name.localeCompare(b.name, 'ja'))
+                  .map(e => (
+                    <option key={e.userId} value={e.userId}>{e.name}</option>
+                  ))}
+              </select>
+            </div>
+            <ShinkansenMap distKm={distKm} userName={mapEntry.name} />
+          </div>
+        );
+      })()}
 
       <p className="text-xs text-gray-400 text-center pt-1">⚠️ = 未提出日あり（0歩として計算）</p>
     </div>
