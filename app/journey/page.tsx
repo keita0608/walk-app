@@ -21,7 +21,6 @@ export default function JourneyPage() {
   const [totalSteps, setTotalSteps]       = useState(0);
   const [loading, setLoading]             = useState(true);
   const [selecting, setSelecting]         = useState(false);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const loadJourney = async (route: Route) => {
     if (!user) return;
@@ -59,16 +58,6 @@ export default function JourneyPage() {
     }
   };
 
-  const handleClear = async () => {
-    if (!user) return;
-    await setJourneyRoute(user.id, null);
-    setSelectedRoute(null);
-    setPosition(null);
-    setTotalSteps(0);
-    setShowClearConfirm(false);
-    setLoading(false);
-  };
-
   const isReady = selectedRoute !== undefined && !loading;
 
   return (
@@ -78,17 +67,7 @@ export default function JourneyPage() {
           ← ホームに戻る
         </Link>
 
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-800">どこまでいける？</h1>
-          {selectedRoute && (
-            <button
-              onClick={() => setShowClearConfirm(true)}
-              className="text-xs text-gray-400 hover:text-red-500 transition-colors"
-            >
-              ルートをクリア
-            </button>
-          )}
-        </div>
+        <h1 className="text-xl font-bold text-gray-800">どこまでいける？</h1>
 
         {!isReady ? (
           <div className="flex justify-center py-12">
@@ -270,31 +249,6 @@ export default function JourneyPage() {
           </>
         ) : null}
 
-        {/* Clear confirmation */}
-        {showClearConfirm && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full space-y-4">
-              <h3 className="font-semibold text-gray-800">ルートをクリアしますか？</h3>
-              <p className="text-sm text-gray-600">
-                クリアすると別のルートを選択できます。歩数データは削除されません。
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowClearConfirm(false)}
-                  className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                >
-                  キャンセル
-                </button>
-                <button
-                  onClick={handleClear}
-                  className="flex-1 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 font-medium"
-                >
-                  クリアする
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </AuthGuard>
   );
