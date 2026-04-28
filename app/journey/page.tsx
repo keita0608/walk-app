@@ -20,6 +20,114 @@ function RouteIcon({ route, style }: { route: Route; style?: React.CSSProperties
   );
 }
 
+function CircularTrack({
+  route,
+  position,
+  routeSteps,
+  otherUsers,
+}: {
+  route: Route;
+  position: JourneyPosition;
+  routeSteps: number;
+  otherUsers: { name: string; pct: number }[];
+}) {
+  const size = 240;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = 84;
+  const circumference = 2 * Math.PI * r;
+  const walkedKm = stepsToKm(routeSteps);
+  const pct = Math.min(position.pct / 100, 1);
+
+  const kmToRad = (km: number) => (km / position.routeKm) * 2 * Math.PI - Math.PI / 2;
+  const kmToXY = (km: number, radius: number) => {
+    const a = kmToRad(km);
+    return { x: cx + radius * Math.cos(a), y: cy + radius * Math.sin(a) };
+  };
+
+  const trainKm = Math.min(walkedKm, position.routeKm);
+  const train = kmToXY(trainKm, r);
+
+  // Stations to label: start (東京) and midStationName (新宿)
+  const labelNames = new Set([
+    route.stations[0].name,
+    ...(route.midStationName ? [route.midStationName] : []),
+  ]);
+
+  return (
+    <svg viewBox={`0 0 ${size} ${size}`} className="w-full max-w-[260px] mx-auto block">
+      {/* Background circle */}
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e5e7eb" strokeWidth="6" />
+      {/* Progress arc */}
+      <circle
+        cx={cx} cy={cy} r={r}
+        fill="none" stroke="#6366f1" strokeWidth="6"
+        strokeDasharray={`${pct * circumference} ${circumference}`}
+        strokeLinecap="round"
+        transform={`rotate(-90, ${cx}, ${cy})`}
+      />
+      {/* Other users arcs/dots */}
+      {otherUsers.map((other, i) => {
+        const op = kmToXY((other.pct / 100) * position.routeKm, r);
+        return (
+          <g key={i}>
+            <circle cx={op.x} cy={op.y} r={6} fill="#fbbf24" stroke="white" strokeWidth="1.5" />
+            <text
+              x={kmToXY((other.pct / 100) * position.routeKm, r + 16).x}
+              y={kmToXY((other.pct / 100) * position.routeKm, r + 16).y}
+              textAnchor="middle" dominantBaseline="middle"
+              fontSize="9" fill="#d97706"
+            >
+              {other.name}
+            </text>
+          </g>
+        );
+      })}
+      {/* Station dots */}
+      {route.stations.map((s) => {
+        const pos = kmToXY(s.km === position.routeKm ? 0 : s.km, r);
+        const passed = s.km <= walkedKm;
+        return (
+          <circle
+            key={s.name}
+            cx={pos.x} cy={pos.y} r={3.5}
+            fill={passed ? '#6366f1' : '#d1d5db'}
+            stroke="white" strokeWidth="1.5"
+          />
+        );
+      })}
+      {/* Train emoji */}
+      {!position.completed && (
+        <text x={train.x} y={train.y} textAnchor="middle" dominantBaseline="middle" fontSize="16" style={{ userSelect: 'none' }}>
+          {route.icon ?? '🚅'}
+        </text>
+      )}
+      {/* Completion */}
+      {position.completed && (
+        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize="36">
+          🎉
+        </text>
+      )}
+      {/* Station labels */}
+      {route.stations
+        .filter((s) => labelNames.has(s.name) && s.km < position.routeKm)
+        .map((s) => {
+          const lp = kmToXY(s.km, r + 20);
+          return (
+            <text
+              key={s.name}
+              x={lp.x} y={lp.y}
+              textAnchor="middle" dominantBaseline="middle"
+              fontSize="11" fill="#6b7280" fontWeight="500"
+            >
+              {s.name}
+            </text>
+          );
+        })}
+    </svg>
+  );
+}
+
 export default function JourneyPage() {
   const { user } = useAuth();
   const [selectedRoute, setSelectedRoute] = useState<Route | null | undefined>(undefined);
@@ -30,8 +138,10 @@ export default function JourneyPage() {
   const [selecting, setSelecting]         = useState(false);
   const [completions, setCompletions]     = useState<Record<string, number>>({});
   const [otherUsers, setOtherUsers]       = useState<{ name: string; pct: number }[]>([]);
+  // Local offset avoids stale user object after completion
+  const [stepOffset, setStepOffset]       = useState(0);
 
-  const loadJourney = async (route: Route, stepOffset: number) => {
+  const loadJourney = async (route: Route, offset: number) => {
     if (!user) return;
     setLoading(true);
     try {
@@ -40,7 +150,7 @@ export default function JourneyPage() {
         getUsers(),
       ]);
       const total = steps.reduce((sum, s) => sum + s.steps, 0);
-      const forRoute = Math.max(0, total - stepOffset);
+      const forRoute = Math.max(0, total - offset);
       setTotalSteps(total);
       setRouteSteps(forRoute);
       setPosition(computePosition(stepsToKm(forRoute), route));
@@ -67,10 +177,12 @@ export default function JourneyPage() {
   useEffect(() => {
     if (!user) return;
     setCompletions(user.journeyCompletions ?? {});
+    const offset = user.journeyRouteStepOffset ?? 0;
+    setStepOffset(offset);
     const route = ROUTES.find((r) => r.id === user.journeyRouteId) ?? null;
     setSelectedRoute(route);
     if (route) {
-      loadJourney(route, user.journeyRouteStepOffset ?? 0);
+      loadJourney(route, offset);
     } else {
       setLoading(false);
     }
@@ -82,7 +194,7 @@ export default function JourneyPage() {
     try {
       await setJourneyRoute(user.id, route.id);
       setSelectedRoute(route);
-      await loadJourney(route, user.journeyRouteStepOffset ?? 0);
+      await loadJourney(route, stepOffset);
     } finally {
       setSelecting(false);
     }
@@ -91,6 +203,10 @@ export default function JourneyPage() {
   const handleNextRoute = async () => {
     if (!user || !selectedRoute) return;
     const routeDistanceKm = selectedRoute.stations[selectedRoute.stations.length - 1].km;
+    // Update local offset immediately so handleSelectRoute uses the correct value
+    // even before AuthContext reflects the Firestore update
+    const newOffset = stepOffset + Math.round(routeDistanceKm * 1000 / 0.7);
+    setStepOffset(newOffset);
     await recordJourneyCompletion(user.id, selectedRoute.id, routeDistanceKm);
     const next = { ...completions, [selectedRoute.id]: (completions[selectedRoute.id] ?? 0) + 1 };
     setCompletions(next);
@@ -186,7 +302,7 @@ export default function JourneyPage() {
               {position.completed ? (
                 <>
                   <p className="text-sm font-bold text-indigo-700">
-                    🎉 {selectedRoute.stations[selectedRoute.stations.length - 1].name}に到着！
+                    🎉 {selectedRoute.circular ? '一周完走しました！' : `${selectedRoute.stations[selectedRoute.stations.length - 1].name}に到着！`}
                   </p>
                   <p className="text-xs text-indigo-500">
                     {selectedRoute.name} {fmt(position.routeKm)} km を完走しました
@@ -207,77 +323,86 @@ export default function JourneyPage() {
 
             {/* Route track */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-              <div className="relative">
-                <div className="relative h-2 bg-gray-200 rounded-full mx-3 my-6">
-                  <div
-                    className="absolute left-0 top-0 h-2 bg-indigo-500 rounded-full transition-all duration-700"
-                    style={{ width: `${Math.min(position.pct, 100)}%` }}
-                  />
-                  {selectedRoute.stations.map((s) => {
-                    const pct    = (s.km / position.routeKm) * 100;
-                    const passed = s.km <= stepsToKm(routeSteps);
-                    return (
-                      <div
-                        key={s.name}
-                        className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full border-2 ${
-                          passed ? 'bg-indigo-500 border-indigo-500' : 'bg-white border-gray-400'
-                        }`}
-                        style={{ left: `${pct}%` }}
-                      />
-                    );
-                  })}
-                  {!position.completed && (
+              {selectedRoute.circular ? (
+                <CircularTrack
+                  route={selectedRoute}
+                  position={position}
+                  routeSteps={routeSteps}
+                  otherUsers={otherUsers}
+                />
+              ) : (
+                <div className="relative">
+                  <div className="relative h-2 bg-gray-200 rounded-full mx-3 my-6">
                     <div
-                      className="absolute top-1/2 -translate-y-1/2 text-lg leading-none z-20"
-                      style={{ left: `${position.pct}%`, transform: 'translateY(-50%) translateX(-50%)' }}
-                    >
-                      <RouteIcon route={selectedRoute} />
-                    </div>
-                  )}
-                  {otherUsers.map((other, i) => (
-                    <React.Fragment key={i}>
+                      className="absolute left-0 top-0 h-2 bg-indigo-500 rounded-full transition-all duration-700"
+                      style={{ width: `${Math.min(position.pct, 100)}%` }}
+                    />
+                    {selectedRoute.stations.map((s) => {
+                      const pct    = (s.km / position.routeKm) * 100;
+                      const passed = s.km <= stepsToKm(routeSteps);
+                      return (
+                        <div
+                          key={s.name}
+                          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full border-2 ${
+                            passed ? 'bg-indigo-500 border-indigo-500' : 'bg-white border-gray-400'
+                          }`}
+                          style={{ left: `${pct}%` }}
+                        />
+                      );
+                    })}
+                    {!position.completed && (
                       <div
-                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-amber-400 border-2 border-amber-500 z-10"
-                        style={{ left: `${other.pct}%` }}
-                      />
-                      <div
-                        className="absolute -translate-x-1/2 text-xs text-amber-600 whitespace-nowrap font-medium"
-                        style={{ left: `${other.pct}%`, bottom: 'calc(100% + 4px)' }}
+                        className="absolute top-1/2 -translate-y-1/2 text-lg leading-none z-20"
+                        style={{ left: `${position.pct}%`, transform: 'translateY(-50%) translateX(-50%)' }}
                       >
-                        {other.name}
+                        <RouteIcon route={selectedRoute} />
                       </div>
-                    </React.Fragment>
-                  ))}
-                </div>
-                {(() => {
-                  const midStation = selectedRoute.midStationName
-                    ? selectedRoute.stations.find((s) => s.name === selectedRoute.midStationName)
-                    : (() => {
-                        const midKm = position.routeKm / 2;
-                        return selectedRoute.stations.reduce((best, s) =>
-                          Math.abs(s.km - midKm) < Math.abs(best.km - midKm) ? s : best
-                        );
-                      })();
-                  return (
-                    <div className="relative h-6 mt-1">
-                      <span className="absolute left-0 text-xs text-gray-500">
-                        {selectedRoute.stations[0].name}
-                      </span>
-                      {midStation && (
-                        <span
-                          className="absolute text-xs text-gray-500 -translate-x-1/2"
-                          style={{ left: `${(midStation.km / position.routeKm) * 100}%` }}
+                    )}
+                    {otherUsers.map((other, i) => (
+                      <React.Fragment key={i}>
+                        <div
+                          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-amber-400 border-2 border-amber-500 z-10"
+                          style={{ left: `${other.pct}%` }}
+                        />
+                        <div
+                          className="absolute -translate-x-1/2 text-xs text-amber-600 whitespace-nowrap font-medium"
+                          style={{ left: `${other.pct}%`, bottom: 'calc(100% + 4px)' }}
                         >
-                          {midStation.name}
+                          {other.name}
+                        </div>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                  {(() => {
+                    const midStation = selectedRoute.midStationName
+                      ? selectedRoute.stations.find((s) => s.name === selectedRoute.midStationName)
+                      : (() => {
+                          const midKm = position.routeKm / 2;
+                          return selectedRoute.stations.reduce((best, s) =>
+                            Math.abs(s.km - midKm) < Math.abs(best.km - midKm) ? s : best
+                          );
+                        })();
+                    return (
+                      <div className="relative h-6 mt-1">
+                        <span className="absolute left-0 text-xs text-gray-500">
+                          {selectedRoute.stations[0].name}
                         </span>
-                      )}
-                      <span className="absolute right-0 text-xs text-gray-500">
-                        {selectedRoute.stations[selectedRoute.stations.length - 1].name}
-                      </span>
-                    </div>
-                  );
-                })()}
-              </div>
+                        {midStation && (
+                          <span
+                            className="absolute text-xs text-gray-500 -translate-x-1/2"
+                            style={{ left: `${(midStation.km / position.routeKm) * 100}%` }}
+                          >
+                            {midStation.name}
+                          </span>
+                        )}
+                        <span className="absolute right-0 text-xs text-gray-500">
+                          {selectedRoute.stations[selectedRoute.stations.length - 1].name}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
 
             {/* Station list */}
