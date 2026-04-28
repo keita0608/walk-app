@@ -31,99 +31,92 @@ function CircularTrack({
   routeSteps: number;
   otherUsers: { name: string; pct: number }[];
 }) {
-  const size = 240;
-  const cx = size / 2;
-  const cy = size / 2;
-  const r = 84;
-  const circumference = 2 * Math.PI * r;
+  const W = 320, H = 340;
+  const cx = W / 2, cy = H / 2;
+  const rx = 86, ry = 114;
+
+  const routeKm  = position.routeKm;
   const walkedKm = stepsToKm(routeSteps);
-  const pct = Math.min(position.pct / 100, 1);
 
-  const kmToRad = (km: number) => (km / position.routeKm) * 2 * Math.PI - Math.PI / 2;
-  const kmToXY = (km: number, radius: number) => {
-    const a = kmToRad(km);
-    return { x: cx + radius * Math.cos(a), y: cy + radius * Math.sin(a) };
-  };
+  // Exclude last station (same position as 東京 in a loop)
+  const stations = route.stations.slice(0, -1);
 
-  const trainKm = Math.min(walkedKm, position.routeKm);
-  const train = kmToXY(trainKm, r);
+  const kmToAngle = (km: number) => (km / routeKm) * 2 * Math.PI - Math.PI / 2;
+  const ptOn = (angle: number, rX: number, rY: number) => ({
+    x: cx + rX * Math.cos(angle),
+    y: cy + rY * Math.sin(angle),
+  });
 
-  // Stations to label: start (東京) and midStationName (新宿)
-  const labelNames = new Set([
-    route.stations[0].name,
-    ...(route.midStationName ? [route.midStationName] : []),
-  ]);
+  // Progress arc path on the ellipse
+  const ratio = Math.min(walkedKm / routeKm, 1);
+  const sp = ptOn(-Math.PI / 2, rx, ry);
+  const ep = ptOn(-Math.PI / 2 + ratio * 2 * Math.PI, rx, ry);
+  const progressPath = ratio >= 1
+    ? `M ${sp.x} ${sp.y} A ${rx} ${ry} 0 1 1 ${sp.x + 0.01} ${sp.y}`
+    : ratio === 0
+    ? null
+    : `M ${sp.x} ${sp.y} A ${rx} ${ry} 0 ${ratio > 0.5 ? 1 : 0} 1 ${ep.x} ${ep.y}`;
+
+  // Train stays just before the finish to avoid wrap-around at 100%
+  const trainAngle = kmToAngle(Math.min(walkedKm, routeKm * 0.9999));
+  const trainPt = ptOn(trainAngle, rx, ry);
 
   return (
-    <svg viewBox={`0 0 ${size} ${size}`} className="w-full max-w-[260px] mx-auto block">
-      {/* Background circle */}
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e5e7eb" strokeWidth="6" />
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[340px] mx-auto block">
+      {/* Background oval */}
+      <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="none" stroke="#e5e7eb" strokeWidth="5" />
       {/* Progress arc */}
-      <circle
-        cx={cx} cy={cy} r={r}
-        fill="none" stroke="#6366f1" strokeWidth="6"
-        strokeDasharray={`${pct * circumference} ${circumference}`}
-        strokeLinecap="round"
-        transform={`rotate(-90, ${cx}, ${cy})`}
-      />
-      {/* Other users arcs/dots */}
+      {progressPath && (
+        <path d={progressPath} fill="none" stroke="#6366f1" strokeWidth="5" strokeLinecap="round" />
+      )}
+      {/* Other users */}
       {otherUsers.map((other, i) => {
-        const op = kmToXY((other.pct / 100) * position.routeKm, r);
+        const pt = ptOn(kmToAngle((other.pct / 100) * routeKm), rx, ry);
+        const lp = ptOn(kmToAngle((other.pct / 100) * routeKm), rx + 20, ry + 20);
+        const ca = Math.cos(kmToAngle((other.pct / 100) * routeKm));
         return (
           <g key={i}>
-            <circle cx={op.x} cy={op.y} r={6} fill="#fbbf24" stroke="white" strokeWidth="1.5" />
+            <circle cx={pt.x} cy={pt.y} r={6} fill="#fbbf24" stroke="white" strokeWidth="2" />
+            <text x={lp.x} y={lp.y} textAnchor={ca > 0.25 ? 'start' : ca < -0.25 ? 'end' : 'middle'}
+              dominantBaseline="middle" fontSize="8" fill="#d97706">{other.name}</text>
+          </g>
+        );
+      })}
+      {/* Station dots + labels */}
+      {stations.map((s) => {
+        const a   = kmToAngle(s.km);
+        const dot = ptOn(a, rx, ry);
+        const lbl = ptOn(a, rx + 19, ry + 19);
+        const ca  = Math.cos(a), sa = Math.sin(a);
+        const passed = s.km <= walkedKm;
+        return (
+          <g key={s.name}>
+            <circle cx={dot.x} cy={dot.y} r={3.5}
+              fill={passed ? '#6366f1' : '#d1d5db'} stroke="white" strokeWidth="1.5" />
             <text
-              x={kmToXY((other.pct / 100) * position.routeKm, r + 16).x}
-              y={kmToXY((other.pct / 100) * position.routeKm, r + 16).y}
-              textAnchor="middle" dominantBaseline="middle"
-              fontSize="9" fill="#d97706"
+              x={lbl.x} y={lbl.y}
+              textAnchor={ca > 0.25 ? 'start' : ca < -0.25 ? 'end' : 'middle'}
+              dominantBaseline={sa < -0.5 ? 'auto' : sa > 0.5 ? 'hanging' : 'middle'}
+              fontSize="7.5"
+              fill={passed ? '#4f46e5' : '#6b7280'}
+              fontWeight={s.name === '東京' ? '700' : '400'}
             >
-              {other.name}
+              {s.name}
             </text>
           </g>
         );
       })}
-      {/* Station dots */}
-      {route.stations.map((s) => {
-        const pos = kmToXY(s.km === position.routeKm ? 0 : s.km, r);
-        const passed = s.km <= walkedKm;
-        return (
-          <circle
-            key={s.name}
-            cx={pos.x} cy={pos.y} r={3.5}
-            fill={passed ? '#6366f1' : '#d1d5db'}
-            stroke="white" strokeWidth="1.5"
-          />
-        );
-      })}
-      {/* Train emoji */}
+      {/* Train */}
       {!position.completed && (
-        <text x={train.x} y={train.y} textAnchor="middle" dominantBaseline="middle" fontSize="16" style={{ userSelect: 'none' }}>
+        <text x={trainPt.x} y={trainPt.y} textAnchor="middle" dominantBaseline="middle"
+          fontSize="15" style={{ userSelect: 'none' }}>
           {route.icon ?? '🚅'}
         </text>
       )}
       {/* Completion */}
       {position.completed && (
-        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize="36">
-          🎉
-        </text>
+        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize="36">🎉</text>
       )}
-      {/* Station labels */}
-      {route.stations
-        .filter((s) => labelNames.has(s.name) && s.km < position.routeKm)
-        .map((s) => {
-          const lp = kmToXY(s.km, r + 20);
-          return (
-            <text
-              key={s.name}
-              x={lp.x} y={lp.y}
-              textAnchor="middle" dominantBaseline="middle"
-              fontSize="11" fill="#6b7280" fontWeight="500"
-            >
-              {s.name}
-            </text>
-          );
-        })}
     </svg>
   );
 }
