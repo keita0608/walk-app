@@ -11,7 +11,7 @@ export interface AppUser {
   gender?: Gender;
   apiToken?: string;
   journeyRouteId?: string;
-  journeyRouteStartDate?: string;
+  journeyRouteStepOffset?: number;  // cumulative steps consumed by completed routes
   journeyCompletions?: Record<string, number>;
 }
 

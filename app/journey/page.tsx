@@ -7,7 +7,6 @@ import AuthGuard from '@/components/AuthGuard';
 import { getStepsByUser, getUsers, setJourneyRoute, recordJourneyCompletion } from '@/lib/firebase/firestore';
 import { computePosition, stepsToKm, JourneyPosition } from '@/lib/utils/journey';
 import { ROUTES, Route } from '@/lib/data/routes';
-import { getTodayJST } from '@/lib/utils/date';
 
 function fmt(km: number) { return km.toFixed(1); }
 
@@ -32,7 +31,7 @@ export default function JourneyPage() {
   const [completions, setCompletions]     = useState<Record<string, number>>({});
   const [otherUsers, setOtherUsers]       = useState<{ name: string; pct: number }[]>([]);
 
-  const loadJourney = async (route: Route, startDate: string) => {
+  const loadJourney = async (route: Route, stepOffset: number) => {
     if (!user) return;
     setLoading(true);
     try {
@@ -41,9 +40,7 @@ export default function JourneyPage() {
         getUsers(),
       ]);
       const total = steps.reduce((sum, s) => sum + s.steps, 0);
-      const forRoute = steps
-        .filter((s) => s.date >= startDate)
-        .reduce((sum, s) => sum + s.steps, 0);
+      const forRoute = Math.max(0, total - stepOffset);
       setTotalSteps(total);
       setRouteSteps(forRoute);
       setPosition(computePosition(stepsToKm(forRoute), route));
@@ -54,12 +51,10 @@ export default function JourneyPage() {
       const others = await Promise.all(
         sameRouteUsers.map(async (u) => {
           const theirSteps = await getStepsByUser(u.id);
-          const theirKm = stepsToKm(
-            theirSteps
-              .filter((s) => s.date >= (u.journeyRouteStartDate ?? '2000-01-01'))
-              .reduce((sum, s) => sum + s.steps, 0),
-          );
-          const pos = computePosition(theirKm, route);
+          const theirTotal = theirSteps.reduce((sum, s) => sum + s.steps, 0);
+          const theirOffset = u.journeyRouteStepOffset ?? 0;
+          const theirForRoute = Math.max(0, theirTotal - theirOffset);
+          const pos = computePosition(stepsToKm(theirForRoute), route);
           return { name: u.name, pct: Math.min(pos.pct, 100) };
         }),
       );
@@ -75,22 +70,19 @@ export default function JourneyPage() {
     const route = ROUTES.find((r) => r.id === user.journeyRouteId) ?? null;
     setSelectedRoute(route);
     if (route) {
-      loadJourney(route, user.journeyRouteStartDate ?? '2000-01-01');
+      loadJourney(route, user.journeyRouteStepOffset ?? 0);
     } else {
       setLoading(false);
     }
   }, [user]);
 
-  // First-time selection: include all historical steps ('2000-01-01')
-  // Re-selection after completion: start fresh from today
-  const handleSelectRoute = async (route: Route, afterCompletion = false) => {
+  const handleSelectRoute = async (route: Route) => {
     if (!user) return;
     setSelecting(true);
     try {
-      const startDate = afterCompletion ? getTodayJST() : '2000-01-01';
-      await setJourneyRoute(user.id, route.id, startDate);
+      await setJourneyRoute(user.id, route.id);
       setSelectedRoute(route);
-      await loadJourney(route, startDate);
+      await loadJourney(route, user.journeyRouteStepOffset ?? 0);
     } finally {
       setSelecting(false);
     }
@@ -98,8 +90,8 @@ export default function JourneyPage() {
 
   const handleNextRoute = async () => {
     if (!user || !selectedRoute) return;
-    await recordJourneyCompletion(user.id, selectedRoute.id);
-    await setJourneyRoute(user.id, null);
+    const routeDistanceKm = selectedRoute.stations[selectedRoute.stations.length - 1].km;
+    await recordJourneyCompletion(user.id, selectedRoute.id, routeDistanceKm);
     const next = { ...completions, [selectedRoute.id]: (completions[selectedRoute.id] ?? 0) + 1 };
     setCompletions(next);
     setSelectedRoute(null);
@@ -141,7 +133,7 @@ export default function JourneyPage() {
                   return (
                     <button
                       key={route.id}
-                      onClick={() => handleSelectRoute(route, position?.completed)}
+                      onClick={() => handleSelectRoute(route)}
                       disabled={selecting}
                       className="w-full text-left bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:border-indigo-300 transition-colors disabled:opacity-50"
                     >

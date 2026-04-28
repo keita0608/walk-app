@@ -50,29 +50,37 @@ export async function saveApiToken(userId: string, token: string): Promise<void>
   await updateDoc(doc(db, 'users', userId), { apiToken: token });
 }
 
-export async function recordJourneyCompletion(userId: string, routeId: string): Promise<void> {
+// Completes the current route: increments completion count, advances step offset,
+// and clears the active route in one write.
+export async function recordJourneyCompletion(
+  userId: string,
+  routeId: string,
+  routeDistanceKm: number,
+): Promise<void> {
   const userSnap = await getDoc(doc(db, 'users', userId));
-  const current = (userSnap.data()?.journeyCompletions as Record<string, number>) ?? {};
+  const data = userSnap.data() ?? {};
+  const completions = (data.journeyCompletions as Record<string, number>) ?? {};
+  const currentOffset = (data.journeyRouteStepOffset as number) ?? 0;
+  const stepsConsumed = Math.round(routeDistanceKm * 1000 / 0.7);
   await updateDoc(doc(db, 'users', userId), {
-    journeyCompletions: { ...current, [routeId]: (current[routeId] ?? 0) + 1 },
+    journeyRouteId: deleteField(),
+    journeyRouteStepOffset: currentOffset + stepsConsumed,
+    journeyCompletions: { ...completions, [routeId]: (completions[routeId] ?? 0) + 1 },
   });
 }
 
 export async function setJourneyRoute(
   userId: string,
   routeId: string | null,
-  startDate?: string,
 ): Promise<void> {
   if (routeId === null) {
+    // Admin full reset: clear route and offset so next selection starts fresh
     await updateDoc(doc(db, 'users', userId), {
       journeyRouteId: deleteField(),
-      journeyRouteStartDate: deleteField(),
+      journeyRouteStepOffset: deleteField(),
     });
   } else {
-    await updateDoc(doc(db, 'users', userId), {
-      journeyRouteId: routeId,
-      journeyRouteStartDate: startDate ?? deleteField(),
-    });
+    await updateDoc(doc(db, 'users', userId), { journeyRouteId: routeId });
   }
 }
 
