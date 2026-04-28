@@ -31,79 +31,75 @@ function CircularTrack({
   routeSteps: number;
   otherUsers: { name: string; pct: number }[];
 }) {
-  const W = 320, H = 340;
+  const W = 300, H = 300;
   const cx = W / 2, cy = H / 2;
-  const rx = 86, ry = 114;
-
-  const routeKm  = position.routeKm;
+  const r  = 94;
+  const circumference = 2 * Math.PI * r;
   const walkedKm = stepsToKm(routeSteps);
+  const routeKm  = position.routeKm;
 
   // Exclude last station (same position as 東京 in a loop)
   const stations = route.stations.slice(0, -1);
+  const n = stations.length;
 
-  const kmToAngle = (km: number) => (km / routeKm) * 2 * Math.PI - Math.PI / 2;
-  const ptOn = (angle: number, rX: number, rY: number) => ({
-    x: cx + rX * Math.cos(angle),
-    y: cy + rY * Math.sin(angle),
+  // Equal angular spacing for dots — avoids clustering
+  const dotAngle = (i: number) => (i / n) * 2 * Math.PI - Math.PI / 2;
+  // Km-based angle for train position and progress arc
+  const kmAngle  = (km: number) => (km / routeKm) * 2 * Math.PI - Math.PI / 2;
+  const pt = (angle: number, radius: number) => ({
+    x: cx + radius * Math.cos(angle),
+    y: cy + radius * Math.sin(angle),
   });
 
-  // Progress arc path on the ellipse
-  const ratio = Math.min(walkedKm / routeKm, 1);
-  const sp = ptOn(-Math.PI / 2, rx, ry);
-  const ep = ptOn(-Math.PI / 2 + ratio * 2 * Math.PI, rx, ry);
-  const progressPath = ratio >= 1
-    ? `M ${sp.x} ${sp.y} A ${rx} ${ry} 0 1 1 ${sp.x + 0.01} ${sp.y}`
-    : ratio === 0
-    ? null
-    : `M ${sp.x} ${sp.y} A ${rx} ${ry} 0 ${ratio > 0.5 ? 1 : 0} 1 ${ep.x} ${ep.y}`;
+  const progressDash = Math.min(walkedKm / routeKm, 1) * circumference;
+  const trainPt = pt(kmAngle(Math.min(walkedKm, routeKm * 0.9999)), r);
 
-  // Train stays just before the finish to avoid wrap-around at 100%
-  const trainAngle = kmToAngle(Math.min(walkedKm, routeKm * 0.9999));
-  const trainPt = ptOn(trainAngle, rx, ry);
+  // Only label these stations to keep the diagram clean
+  const keyLabels = new Set(['東京', '上野', '池袋', '新宿', '渋谷', '品川']);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[340px] mx-auto block">
-      {/* Background oval */}
-      <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="none" stroke="#e5e7eb" strokeWidth="5" />
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[300px] mx-auto block">
+      {/* Track circle */}
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e5e7eb" strokeWidth="6" />
       {/* Progress arc */}
-      {progressPath && (
-        <path d={progressPath} fill="none" stroke="#6366f1" strokeWidth="5" strokeLinecap="round" />
-      )}
-      {/* Other users */}
-      {otherUsers.map((other, i) => {
-        const pt = ptOn(kmToAngle((other.pct / 100) * routeKm), rx, ry);
-        const lp = ptOn(kmToAngle((other.pct / 100) * routeKm), rx + 20, ry + 20);
-        const ca = Math.cos(kmToAngle((other.pct / 100) * routeKm));
+      <circle
+        cx={cx} cy={cy} r={r}
+        fill="none" stroke="#6366f1" strokeWidth="6"
+        strokeDasharray={`${progressDash} ${circumference}`}
+        strokeLinecap="round"
+        transform={`rotate(-90, ${cx}, ${cy})`}
+      />
+      {/* Route name in center */}
+      <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
+        fontSize="12" fill="#9ca3af" fontWeight="500">{route.name}</text>
+      {/* Station dots (equally spaced) + key labels */}
+      {stations.map((s, i) => {
+        const a      = dotAngle(i);
+        const dot    = pt(a, r);
+        const passed = s.km <= walkedKm;
+        const isKey  = keyLabels.has(s.name);
+        const ca = Math.cos(a), sa = Math.sin(a);
         return (
-          <g key={i}>
-            <circle cx={pt.x} cy={pt.y} r={6} fill="#fbbf24" stroke="white" strokeWidth="2" />
-            <text x={lp.x} y={lp.y} textAnchor={ca > 0.25 ? 'start' : ca < -0.25 ? 'end' : 'middle'}
-              dominantBaseline="middle" fontSize="8" fill="#d97706">{other.name}</text>
+          <g key={s.name}>
+            <circle cx={dot.x} cy={dot.y} r={isKey ? 5 : 3.5}
+              fill={passed ? '#6366f1' : 'white'}
+              stroke={passed ? '#6366f1' : '#9ca3af'} strokeWidth="1.5" />
+            {isKey && (
+              <text x={pt(a, r + 18).x} y={pt(a, r + 18).y}
+                textAnchor={ca > 0.25 ? 'start' : ca < -0.25 ? 'end' : 'middle'}
+                dominantBaseline={sa < -0.5 ? 'auto' : sa > 0.5 ? 'hanging' : 'middle'}
+                fontSize="10" fill={passed ? '#4338ca' : '#374151'} fontWeight="600">
+                {s.name}
+              </text>
+            )}
           </g>
         );
       })}
-      {/* Station dots + labels */}
-      {stations.map((s) => {
-        const a   = kmToAngle(s.km);
-        const dot = ptOn(a, rx, ry);
-        const lbl = ptOn(a, rx + 19, ry + 19);
-        const ca  = Math.cos(a), sa = Math.sin(a);
-        const passed = s.km <= walkedKm;
+      {/* Other users */}
+      {otherUsers.map((other, i) => {
+        const p = pt(kmAngle((other.pct / 100) * routeKm), r);
         return (
-          <g key={s.name}>
-            <circle cx={dot.x} cy={dot.y} r={3.5}
-              fill={passed ? '#6366f1' : '#d1d5db'} stroke="white" strokeWidth="1.5" />
-            <text
-              x={lbl.x} y={lbl.y}
-              textAnchor={ca > 0.25 ? 'start' : ca < -0.25 ? 'end' : 'middle'}
-              dominantBaseline={sa < -0.5 ? 'auto' : sa > 0.5 ? 'hanging' : 'middle'}
-              fontSize="7.5"
-              fill={passed ? '#4f46e5' : '#6b7280'}
-              fontWeight={s.name === '東京' ? '700' : '400'}
-            >
-              {s.name}
-            </text>
-          </g>
+          <circle key={i} cx={p.x} cy={p.y} r={6} fill="#fbbf24" stroke="white" strokeWidth="2" />
         );
       })}
       {/* Train */}
@@ -115,7 +111,7 @@ function CircularTrack({
       )}
       {/* Completion */}
       {position.completed && (
-        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize="36">🎉</text>
+        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize="34">🎉</text>
       )}
     </svg>
   );
