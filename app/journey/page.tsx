@@ -7,7 +7,6 @@ import AuthGuard from '@/components/AuthGuard';
 import { getStepsByUser, getUsers, setJourneyRoute, recordJourneyCompletion } from '@/lib/firebase/firestore';
 import { computePosition, stepsToKm, JourneyPosition } from '@/lib/utils/journey';
 import { ROUTES, Route } from '@/lib/data/routes';
-import { getTodayJST } from '@/lib/utils/date';
 
 function fmt(km: number) { return km.toFixed(1); }
 
@@ -21,6 +20,107 @@ function RouteIcon({ route, style }: { route: Route; style?: React.CSSProperties
   );
 }
 
+function CircularTrack({
+  route,
+  position,
+  routeSteps,
+  otherUsers,
+}: {
+  route: Route;
+  position: JourneyPosition;
+  routeSteps: number;
+  otherUsers: { name: string; pct: number }[];
+}) {
+  const W = 320, H = 340;
+  const cx = W / 2, cy = H / 2;
+  const rx = 86, ry = 114;
+
+  const routeKm  = position.routeKm;
+  const walkedKm = stepsToKm(routeSteps);
+
+  // Exclude last station (same position as 東京 in a loop)
+  const stations = route.stations.slice(0, -1);
+
+  const kmToAngle = (km: number) => (km / routeKm) * 2 * Math.PI - Math.PI / 2;
+  const ptOn = (angle: number, rX: number, rY: number) => ({
+    x: cx + rX * Math.cos(angle),
+    y: cy + rY * Math.sin(angle),
+  });
+
+  // Progress arc path on the ellipse
+  const ratio = Math.min(walkedKm / routeKm, 1);
+  const sp = ptOn(-Math.PI / 2, rx, ry);
+  const ep = ptOn(-Math.PI / 2 + ratio * 2 * Math.PI, rx, ry);
+  const progressPath = ratio >= 1
+    ? `M ${sp.x} ${sp.y} A ${rx} ${ry} 0 1 1 ${sp.x + 0.01} ${sp.y}`
+    : ratio === 0
+    ? null
+    : `M ${sp.x} ${sp.y} A ${rx} ${ry} 0 ${ratio > 0.5 ? 1 : 0} 1 ${ep.x} ${ep.y}`;
+
+  // Train stays just before the finish to avoid wrap-around at 100%
+  const trainAngle = kmToAngle(Math.min(walkedKm, routeKm * 0.9999));
+  const trainPt = ptOn(trainAngle, rx, ry);
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[340px] mx-auto block">
+      {/* Background oval */}
+      <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="none" stroke="#e5e7eb" strokeWidth="5" />
+      {/* Progress arc */}
+      {progressPath && (
+        <path d={progressPath} fill="none" stroke="#6366f1" strokeWidth="5" strokeLinecap="round" />
+      )}
+      {/* Other users */}
+      {otherUsers.map((other, i) => {
+        const pt = ptOn(kmToAngle((other.pct / 100) * routeKm), rx, ry);
+        const lp = ptOn(kmToAngle((other.pct / 100) * routeKm), rx + 20, ry + 20);
+        const ca = Math.cos(kmToAngle((other.pct / 100) * routeKm));
+        return (
+          <g key={i}>
+            <circle cx={pt.x} cy={pt.y} r={6} fill="#fbbf24" stroke="white" strokeWidth="2" />
+            <text x={lp.x} y={lp.y} textAnchor={ca > 0.25 ? 'start' : ca < -0.25 ? 'end' : 'middle'}
+              dominantBaseline="middle" fontSize="8" fill="#d97706">{other.name}</text>
+          </g>
+        );
+      })}
+      {/* Station dots + labels */}
+      {stations.map((s) => {
+        const a   = kmToAngle(s.km);
+        const dot = ptOn(a, rx, ry);
+        const lbl = ptOn(a, rx + 19, ry + 19);
+        const ca  = Math.cos(a), sa = Math.sin(a);
+        const passed = s.km <= walkedKm;
+        return (
+          <g key={s.name}>
+            <circle cx={dot.x} cy={dot.y} r={3.5}
+              fill={passed ? '#6366f1' : '#d1d5db'} stroke="white" strokeWidth="1.5" />
+            <text
+              x={lbl.x} y={lbl.y}
+              textAnchor={ca > 0.25 ? 'start' : ca < -0.25 ? 'end' : 'middle'}
+              dominantBaseline={sa < -0.5 ? 'auto' : sa > 0.5 ? 'hanging' : 'middle'}
+              fontSize="7.5"
+              fill={passed ? '#4f46e5' : '#6b7280'}
+              fontWeight={s.name === '東京' ? '700' : '400'}
+            >
+              {s.name}
+            </text>
+          </g>
+        );
+      })}
+      {/* Train */}
+      {!position.completed && (
+        <text x={trainPt.x} y={trainPt.y} textAnchor="middle" dominantBaseline="middle"
+          fontSize="15" style={{ userSelect: 'none' }}>
+          {route.icon ?? '🚅'}
+        </text>
+      )}
+      {/* Completion */}
+      {position.completed && (
+        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize="36">🎉</text>
+      )}
+    </svg>
+  );
+}
+
 export default function JourneyPage() {
   const { user } = useAuth();
   const [selectedRoute, setSelectedRoute] = useState<Route | null | undefined>(undefined);
@@ -31,8 +131,10 @@ export default function JourneyPage() {
   const [selecting, setSelecting]         = useState(false);
   const [completions, setCompletions]     = useState<Record<string, number>>({});
   const [otherUsers, setOtherUsers]       = useState<{ name: string; pct: number }[]>([]);
+  // Local offset avoids stale user object after completion
+  const [stepOffset, setStepOffset]       = useState(0);
 
-  const loadJourney = async (route: Route, startDate: string) => {
+  const loadJourney = async (route: Route, offset: number) => {
     if (!user) return;
     setLoading(true);
     try {
@@ -41,9 +143,7 @@ export default function JourneyPage() {
         getUsers(),
       ]);
       const total = steps.reduce((sum, s) => sum + s.steps, 0);
-      const forRoute = steps
-        .filter((s) => s.date >= startDate)
-        .reduce((sum, s) => sum + s.steps, 0);
+      const forRoute = Math.max(0, total - offset);
       setTotalSteps(total);
       setRouteSteps(forRoute);
       setPosition(computePosition(stepsToKm(forRoute), route));
@@ -54,12 +154,10 @@ export default function JourneyPage() {
       const others = await Promise.all(
         sameRouteUsers.map(async (u) => {
           const theirSteps = await getStepsByUser(u.id);
-          const theirKm = stepsToKm(
-            theirSteps
-              .filter((s) => s.date >= (u.journeyRouteStartDate ?? '2000-01-01'))
-              .reduce((sum, s) => sum + s.steps, 0),
-          );
-          const pos = computePosition(theirKm, route);
+          const theirTotal = theirSteps.reduce((sum, s) => sum + s.steps, 0);
+          const theirOffset = u.journeyRouteStepOffset ?? 0;
+          const theirForRoute = Math.max(0, theirTotal - theirOffset);
+          const pos = computePosition(stepsToKm(theirForRoute), route);
           return { name: u.name, pct: Math.min(pos.pct, 100) };
         }),
       );
@@ -72,25 +170,24 @@ export default function JourneyPage() {
   useEffect(() => {
     if (!user) return;
     setCompletions(user.journeyCompletions ?? {});
+    const offset = user.journeyRouteStepOffset ?? 0;
+    setStepOffset(offset);
     const route = ROUTES.find((r) => r.id === user.journeyRouteId) ?? null;
     setSelectedRoute(route);
     if (route) {
-      loadJourney(route, user.journeyRouteStartDate ?? '2000-01-01');
+      loadJourney(route, offset);
     } else {
       setLoading(false);
     }
   }, [user]);
 
-  // First-time selection: include all historical steps ('2000-01-01')
-  // Re-selection after completion: start fresh from today
-  const handleSelectRoute = async (route: Route, afterCompletion = false) => {
+  const handleSelectRoute = async (route: Route) => {
     if (!user) return;
     setSelecting(true);
     try {
-      const startDate = afterCompletion ? getTodayJST() : '2000-01-01';
-      await setJourneyRoute(user.id, route.id, startDate);
+      await setJourneyRoute(user.id, route.id);
       setSelectedRoute(route);
-      await loadJourney(route, startDate);
+      await loadJourney(route, stepOffset);
     } finally {
       setSelecting(false);
     }
@@ -98,8 +195,12 @@ export default function JourneyPage() {
 
   const handleNextRoute = async () => {
     if (!user || !selectedRoute) return;
-    await recordJourneyCompletion(user.id, selectedRoute.id);
-    await setJourneyRoute(user.id, null);
+    const routeDistanceKm = selectedRoute.stations[selectedRoute.stations.length - 1].km;
+    // Update local offset immediately so handleSelectRoute uses the correct value
+    // even before AuthContext reflects the Firestore update
+    const newOffset = stepOffset + Math.round(routeDistanceKm * 1000 / 0.7);
+    setStepOffset(newOffset);
+    await recordJourneyCompletion(user.id, selectedRoute.id, routeDistanceKm);
     const next = { ...completions, [selectedRoute.id]: (completions[selectedRoute.id] ?? 0) + 1 };
     setCompletions(next);
     setSelectedRoute(null);
@@ -141,7 +242,7 @@ export default function JourneyPage() {
                   return (
                     <button
                       key={route.id}
-                      onClick={() => handleSelectRoute(route, position?.completed)}
+                      onClick={() => handleSelectRoute(route)}
                       disabled={selecting}
                       className="w-full text-left bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:border-indigo-300 transition-colors disabled:opacity-50"
                     >
@@ -194,7 +295,7 @@ export default function JourneyPage() {
               {position.completed ? (
                 <>
                   <p className="text-sm font-bold text-indigo-700">
-                    🎉 {selectedRoute.stations[selectedRoute.stations.length - 1].name}に到着！
+                    🎉 {selectedRoute.circular ? '一周完走しました！' : `${selectedRoute.stations[selectedRoute.stations.length - 1].name}に到着！`}
                   </p>
                   <p className="text-xs text-indigo-500">
                     {selectedRoute.name} {fmt(position.routeKm)} km を完走しました
@@ -215,77 +316,86 @@ export default function JourneyPage() {
 
             {/* Route track */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-              <div className="relative">
-                <div className="relative h-2 bg-gray-200 rounded-full mx-3 my-6">
-                  <div
-                    className="absolute left-0 top-0 h-2 bg-indigo-500 rounded-full transition-all duration-700"
-                    style={{ width: `${Math.min(position.pct, 100)}%` }}
-                  />
-                  {selectedRoute.stations.map((s) => {
-                    const pct    = (s.km / position.routeKm) * 100;
-                    const passed = s.km <= stepsToKm(routeSteps);
-                    return (
-                      <div
-                        key={s.name}
-                        className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full border-2 ${
-                          passed ? 'bg-indigo-500 border-indigo-500' : 'bg-white border-gray-400'
-                        }`}
-                        style={{ left: `${pct}%` }}
-                      />
-                    );
-                  })}
-                  {!position.completed && (
+              {selectedRoute.circular ? (
+                <CircularTrack
+                  route={selectedRoute}
+                  position={position}
+                  routeSteps={routeSteps}
+                  otherUsers={otherUsers}
+                />
+              ) : (
+                <div className="relative">
+                  <div className="relative h-2 bg-gray-200 rounded-full mx-3 my-6">
                     <div
-                      className="absolute top-1/2 -translate-y-1/2 text-lg leading-none z-20"
-                      style={{ left: `${position.pct}%`, transform: 'translateY(-50%) translateX(-50%)' }}
-                    >
-                      <RouteIcon route={selectedRoute} />
-                    </div>
-                  )}
-                  {otherUsers.map((other, i) => (
-                    <React.Fragment key={i}>
+                      className="absolute left-0 top-0 h-2 bg-indigo-500 rounded-full transition-all duration-700"
+                      style={{ width: `${Math.min(position.pct, 100)}%` }}
+                    />
+                    {selectedRoute.stations.map((s) => {
+                      const pct    = (s.km / position.routeKm) * 100;
+                      const passed = s.km <= stepsToKm(routeSteps);
+                      return (
+                        <div
+                          key={s.name}
+                          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full border-2 ${
+                            passed ? 'bg-indigo-500 border-indigo-500' : 'bg-white border-gray-400'
+                          }`}
+                          style={{ left: `${pct}%` }}
+                        />
+                      );
+                    })}
+                    {!position.completed && (
                       <div
-                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-amber-400 border-2 border-amber-500 z-10"
-                        style={{ left: `${other.pct}%` }}
-                      />
-                      <div
-                        className="absolute -translate-x-1/2 text-xs text-amber-600 whitespace-nowrap font-medium"
-                        style={{ left: `${other.pct}%`, bottom: 'calc(100% + 4px)' }}
+                        className="absolute top-1/2 -translate-y-1/2 text-lg leading-none z-20"
+                        style={{ left: `${position.pct}%`, transform: 'translateY(-50%) translateX(-50%)' }}
                       >
-                        {other.name}
+                        <RouteIcon route={selectedRoute} />
                       </div>
-                    </React.Fragment>
-                  ))}
-                </div>
-                {(() => {
-                  const midStation = selectedRoute.midStationName
-                    ? selectedRoute.stations.find((s) => s.name === selectedRoute.midStationName)
-                    : (() => {
-                        const midKm = position.routeKm / 2;
-                        return selectedRoute.stations.reduce((best, s) =>
-                          Math.abs(s.km - midKm) < Math.abs(best.km - midKm) ? s : best
-                        );
-                      })();
-                  return (
-                    <div className="relative h-6 mt-1">
-                      <span className="absolute left-0 text-xs text-gray-500">
-                        {selectedRoute.stations[0].name}
-                      </span>
-                      {midStation && (
-                        <span
-                          className="absolute text-xs text-gray-500 -translate-x-1/2"
-                          style={{ left: `${(midStation.km / position.routeKm) * 100}%` }}
+                    )}
+                    {otherUsers.map((other, i) => (
+                      <React.Fragment key={i}>
+                        <div
+                          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-amber-400 border-2 border-amber-500 z-10"
+                          style={{ left: `${other.pct}%` }}
+                        />
+                        <div
+                          className="absolute -translate-x-1/2 text-xs text-amber-600 whitespace-nowrap font-medium"
+                          style={{ left: `${other.pct}%`, bottom: 'calc(100% + 4px)' }}
                         >
-                          {midStation.name}
+                          {other.name}
+                        </div>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                  {(() => {
+                    const midStation = selectedRoute.midStationName
+                      ? selectedRoute.stations.find((s) => s.name === selectedRoute.midStationName)
+                      : (() => {
+                          const midKm = position.routeKm / 2;
+                          return selectedRoute.stations.reduce((best, s) =>
+                            Math.abs(s.km - midKm) < Math.abs(best.km - midKm) ? s : best
+                          );
+                        })();
+                    return (
+                      <div className="relative h-6 mt-1">
+                        <span className="absolute left-0 text-xs text-gray-500">
+                          {selectedRoute.stations[0].name}
                         </span>
-                      )}
-                      <span className="absolute right-0 text-xs text-gray-500">
-                        {selectedRoute.stations[selectedRoute.stations.length - 1].name}
-                      </span>
-                    </div>
-                  );
-                })()}
-              </div>
+                        {midStation && (
+                          <span
+                            className="absolute text-xs text-gray-500 -translate-x-1/2"
+                            style={{ left: `${(midStation.km / position.routeKm) * 100}%` }}
+                          >
+                            {midStation.name}
+                          </span>
+                        )}
+                        <span className="absolute right-0 text-xs text-gray-500">
+                          {selectedRoute.stations[selectedRoute.stations.length - 1].name}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
 
             {/* Station list */}

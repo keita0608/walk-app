@@ -7,9 +7,10 @@ export interface Route {
   id: string;
   name: string;
   stations: Station[];
-  icon?: string;          // default '🚅'
-  flipIcon?: boolean;     // default true (trains face left)
+  icon?: string;           // default '🚅'
+  flipIcon?: boolean;      // default true (trains face left)
   midStationName?: string; // label shown at midpoint of progress bar
+  circular?: boolean;      // render as circle (loop lines)
 }
 
 export const TOKAIDO: Route = {
@@ -115,6 +116,7 @@ export const YAMANOTE: Route = {
   id: 'yamanote',
   name: '山手線',
   midStationName: '新宿',
+  circular: true,
   stations: [
     { name: '東京',           km: 0 },
     { name: '神田',           km: 1.3 },
